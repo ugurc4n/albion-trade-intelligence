@@ -1,10 +1,13 @@
 import { expandRows, isIdTag, isObjectIdLike } from "./extract";
-import { EQUIPMENT_CHANGED_EVENT, readMainHand } from "./equipment";
+import { EQUIPMENT_CHANGED_EVENT, mainHandFromIndex, readEquipmentItem, readJoinEquipment, readMainHand } from "./equipment";
 import { readFameReward } from "./fame";
 import { messageSignature, type PhotonMessage } from "./photon";
 import type { DamageConfig, MainHandObservation, PlayerStats, SessionRecord } from "./types";
 
 const MAX_IDENTITIES = 5000;
+const MAX_ITEM_OBJECTS = 20_000;
+/** Shown for your own character until the join reply (next zone change) gives the real name. */
+export const SELF_PLACEHOLDER = "Sen";
 /** Sanity bound: a single health change beyond this is treated as corrupt data, not damage. */
 const MAX_SINGLE_CHANGE = 10_000_000;
 
@@ -50,6 +53,10 @@ export class DamageMeter {
   private selfId: number | null = null;
   /** Lifetime counters prevent UDP duplicates and calibration replay from counting rewards twice. */
   private fameCounters = new Map<string, number>();
+  /** Item object id → item index (NewEquipmentItem); used to resolve your own Main Hand. */
+  private itemObjects = new Map<number, number>();
+  /** Object ids of your equipped items from the last join reply (slot 0 = Main Hand). */
+  private selfEquipment: number[] | null = null;
 
   constructor(
     private config: DamageConfig | null = null,
@@ -150,10 +157,17 @@ export class DamageMeter {
       const id = msg.params.get(0);
       const name = msg.params.get(2);
       if (isObjectIdLike(id) && isIdTag(msg.types.get(0)) && typeof name === "string" && name.length > 0) {
-        this.learn(id, name);
-        this.self = name;
-        this.selfId = id;
+        this.setSelf(id, name);
+        this.selfEquipment = readJoinEquipment(msg);
+        this.resolveSelfMainHand(msg.at);
       }
+    }
+    const equipmentItem = readEquipmentItem(msg);
+    if (equipmentItem) {
+      this.itemObjects.delete(equipmentItem.objectId);
+      this.itemObjects.set(equipmentItem.objectId, equipmentItem.index);
+      if (this.itemObjects.size > MAX_ITEM_OBJECTS) this.itemObjects.delete(this.itemObjects.keys().next().value!);
+      if (this.selfEquipment?.[0] === equipmentItem.objectId) this.resolveSelfMainHand(msg.at);
     }
     if (msg.kind === "event" && msg.code === EQUIPMENT_CHANGED_EVENT) {
       const id = msg.params.get(0);
@@ -169,10 +183,8 @@ export class DamageMeter {
       if (typeof name === "string" && name.length > 0 && isObjectIdLike(id) && isIdTag(msg.types.get(rule.idKey))) {
         this.learn(id, name);
         if (msg.kind === "event" && rule.nameKey === 1) this.learnEquipment(id, readMainHand(msg, 40), msg.at);
-        if (msg.kind === "response") {
-          this.self = name;
-          this.selfId = id;
-        }
+        // Your real name may arrive from another identity message before the next join reply.
+        if (msg.kind === "response" || (id === this.selfId && this.self === SELF_PLACEHOLDER)) this.setSelf(id, name);
       }
     }
   }
@@ -230,7 +242,11 @@ export class DamageMeter {
 
   private handleFame(msg: PhotonMessage) {
     const reward = readFameReward(msg);
-    if (!reward || !this.self || reward.objectId !== this.selfId) return;
+    if (!reward) return;
+    // The game sends UpdateFame only for the local player, so it identifies you even when the capture
+    // started mid-zone (no join reply yet). The real name replaces the placeholder at the next join.
+    if (this.selfId === null) this.setSelf(reward.objectId, this.identities.get(reward.objectId) ?? SELF_PLACEHOLDER);
+    if (!this.self || reward.objectId !== this.selfId) return;
     const previous = this.fameCounters.get(this.self);
     if (previous !== undefined && reward.cumulative <= previous) return;
     this.fameCounters.delete(this.self);
@@ -255,6 +271,62 @@ export class DamageMeter {
       fame.lastBonusPercent = reward.lastBonusPercent;
     }
     this.lastActivityAt = Math.max(this.lastActivityAt ?? 0, msg.at);
+  }
+
+  /** Records your own character; a placeholder name (from Fame) is renamed in place once the join reply arrives. */
+  private setSelf(id: number, name: string) {
+    const previous = this.self;
+    const previousId = this.selfId;
+    this.self = name;
+    this.selfId = id;
+    if (previous === SELF_PLACEHOLDER && name !== SELF_PLACEHOLDER) this.renamePlayer(SELF_PLACEHOLDER, name);
+    if (previousId === id && this.identities.get(id) === SELF_PLACEHOLDER) {
+      this.identities.set(id, name); // same object: keep its equipment
+    } else {
+      this.learn(id, name);
+    }
+  }
+
+  private renamePlayer(from: string, to: string) {
+    const old = this.players.get(from);
+    if (old) {
+      this.players.delete(from);
+      const existing = this.players.get(to);
+      if (existing) {
+        existing.damage += old.damage;
+        existing.heal += old.heal;
+        existing.taken += old.taken;
+        existing.hits += old.hits;
+        existing.firstAt = Math.min(existing.firstAt ?? Infinity, old.firstAt ?? Infinity);
+        if (!Number.isFinite(existing.firstAt)) existing.firstAt = null;
+        existing.lastAt = Math.max(existing.lastAt ?? -Infinity, old.lastAt ?? -Infinity);
+        if (!Number.isFinite(existing.lastAt)) existing.lastAt = null;
+        existing.mainHand ??= old.mainHand;
+      } else {
+        this.players.set(to, { ...old, name: to });
+      }
+    }
+    const at = this.playerEquipmentAt.get(from);
+    if (at !== undefined) {
+      this.playerEquipmentAt.delete(from);
+      this.playerEquipmentAt.set(to, at);
+    }
+    const counter = this.fameCounters.get(from);
+    if (counter !== undefined) {
+      this.fameCounters.delete(from);
+      this.fameCounters.set(to, counter);
+    }
+    if (this.session?.fame?.name === from) this.session.fame.name = to;
+    for (const [id, n] of this.identities) if (n === from) this.identities.set(id, to);
+  }
+
+  /** Your Main Hand = the item object in slot 0 of the join reply, once NewEquipmentItem has named it. */
+  private resolveSelfMainHand(at: number) {
+    if (this.selfId === null || !this.selfEquipment) return;
+    const objectId = this.selfEquipment[0];
+    if (objectId === 0) return this.learnEquipment(this.selfId, mainHandFromIndex(0, at), at);
+    const index = this.itemObjects.get(objectId);
+    if (index !== undefined) this.learnEquipment(this.selfId, mainHandFromIndex(index, at), at);
   }
 
   private learn(id: number, name: string) {

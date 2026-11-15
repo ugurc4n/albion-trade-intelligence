@@ -44,16 +44,18 @@ describe("personal Fame from decoded packets", () => {
     expect(h.meter.snapshot()!.fame).toMatchObject({ total: 540, premium: 100, satchel: 40, lastBonusPercent: null });
   });
 
-  it("never attributes another character's rewards or unrecognised traffic to the local character", () => {
+  it("credits Fame before the join reply to you (UpdateFame is local-player only) but never another character's", () => {
     const h = harness();
     h.meter.startSession("self", "Self", 0);
+    // Capture started mid-zone: the first reward identifies you under a placeholder name.
     h.reward(100, 100, 1);
-    expect(h.meter.snapshot()!.fame).toBeNull();
+    expect(h.meter.snapshot()!.fame).toMatchObject({ name: "Sen", total: 100 });
     h.join();
-    h.reward(200, 100, 2, {}, 202);
-    expect(h.meter.snapshot()!.fame).toBeNull();
-    h.reward(100, 100, 3);
+    expect(h.meter.snapshot()!.fame).toMatchObject({ name: "Alice", total: 100 });
+    h.reward(200, 100, 2, {}, 202); // another object id: not you
     expect(h.meter.snapshot()!.fame!.total).toBe(100);
+    h.reward(300, 50, 3);
+    expect(h.meter.snapshot()!.fame!.total).toBe(150);
   });
 
   it("deduplicates retransmissions and calibration replay, including across sessions and zone changes", () => {

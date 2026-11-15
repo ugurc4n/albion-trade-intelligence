@@ -156,7 +156,16 @@ function FameSummary({ session, now }: { session: SessionRecord; now: number }) 
 
 function MainHandCell({ player }: { player: PlayerStats }) {
   const observation = player.mainHand;
-  if (!observation) return <span className="text-xs text-muted-foreground" title="Main Hand bilgisi henüz alınmadı.">Bilinmiyor</span>;
+  if (!observation) {
+    return (
+      <span
+        className="cursor-help text-xs text-muted-foreground underline decoration-dotted underline-offset-2"
+        title="Main Hand, oyuncu bölgeye girerken ya da ekipman değiştirince öğrenilir. Yakalayıcıyı başlattıktan sonra bir kez bölge değiştir."
+      >
+        Bilinmiyor
+      </span>
+    );
+  }
   const item = observation.item;
   if (!item) return <span lang="en" className="text-xs text-muted-foreground">Unarmed</span>;
   return (
