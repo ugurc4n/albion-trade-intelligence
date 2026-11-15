@@ -12,8 +12,11 @@ files:
 extraResources:
   - from: .next-electron/standalone
     to: server
+    # node_modules must be listed explicitly: electron-builder skips it in extraResources otherwise.
     filter:
       - "**/*"
+      - "node_modules/**/*"
+      - "**/node_modules/**/*"
   - from: build/capture
     to: capture
     filter:
