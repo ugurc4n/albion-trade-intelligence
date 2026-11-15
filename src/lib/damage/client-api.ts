@@ -1,0 +1,60 @@
+/** Browser-side calls to our own /api/damage/* route handlers. */
+import { ClientApiError } from "@/lib/api-client";
+import type { ControlBody } from "./api-schemas";
+import type { CalibrationResult } from "./calibrate";
+import type { DamageState } from "./service";
+import type { SessionRecord, SessionSummary } from "./types";
+
+async function call<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
+  if (res.ok) return (await res.json()) as T;
+  let body: { error?: { kind?: string; message?: string } } = {};
+  try {
+    body = await res.json();
+  } catch {
+    // non-JSON error body
+  }
+  throw new ClientApiError(body.error?.message ?? `Sunucu hatası (HTTP ${res.status})`, body.error?.kind ?? "unknown", res.status);
+}
+
+const post = (body: unknown): RequestInit => ({
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+
+export type CalibrationResponse = CalibrationResult & { captureId: string; packets: number };
+
+export const damageApi = {
+  state: (signal?: AbortSignal) => call<DamageState>("/api/damage/state", { signal, cache: "no-store" }),
+  control: (body: ControlBody) => call<unknown>("/api/damage/control", post(body)),
+  calibrate: (names: string[]) => call<CalibrationResponse>("/api/damage/calibrate", post({ names })),
+  sessions: (signal?: AbortSignal) => call<{ sessions: SessionSummary[] }>("/api/damage/sessions", { signal, cache: "no-store" }),
+  session: (id: string, signal?: AbortSignal) =>
+    call<{ session: SessionRecord }>(`/api/damage/sessions/${encodeURIComponent(id)}`, { signal, cache: "no-store" }),
+  deleteSession: (id: string) => call<{ ok: true }>(`/api/damage/sessions/${encodeURIComponent(id)}`, { method: "DELETE" }),
+};
+
+/** "1:02:05" / "4:07" */
+export function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
+  return `${h > 0 ? `${h}:` : ""}${mm}:${String(s).padStart(2, "0")}`;
+}
+
+/** Splits a free-form list ("Ugur, Ali\nVeli") into unique names. */
+export function parseNames(text: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of text.split(/[\n,;]+/)) {
+    const n = raw.trim();
+    if (n && n.length <= 40 && !seen.has(n.toLowerCase())) {
+      seen.add(n.toLowerCase());
+      out.push(n);
+    }
+  }
+  return out.slice(0, 20);
+}

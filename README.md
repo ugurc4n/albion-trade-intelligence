@@ -1,36 +1,177 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Albion Trade Intelligence
 
-## Getting Started
+Albion Online için **gerçek piyasa verileriyle** çalışan bir ticaret karar destek paneli. Market flipping ve kraliyet şehirleri arası ticaret fırsatlarını; vergiler, likidite, veri güncelliği ve sermaye kısıtlarıyla birlikte değerlendirir.
 
-First, run the development server:
+> Bu bir karar destek aracıdır, oyun içi bot değildir. Oyun istemcisine müdahale etmez. Gösterilen kârlar tahminidir ve garanti değildir.
+
+## Kurulum
+
+Gereksinimler: Node.js ≥ 20.9 (Node 25 ile test edildi), npm.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Komut | Açıklama |
+| --- | --- |
+| `npm run dev` | Geliştirme sunucusu |
+| `npm run build` / `npm start` | Üretim derlemesi / sunucusu |
+| `npm test` | Vitest birim testleri |
+| `npm run lint` / `npm run typecheck` | ESLint / TypeScript (strict) |
+| `npm run catalog` | Item kataloğunu ao-bin-dumps'tan yeniden üretir (`src/data/catalog.json`) |
+| `npm run avalon` | Avalon Yolları bölge verisini ao-bin-dumps'tan yeniden üretir (`src/data/avalon.json`) |
+| `npm run damage:simulate -- <url>` | Damage meter boru hattını oyun olmadan, **sentetik** paketlerle dener (gerçek veri değildir) |
+| `npm run smoke` | Gerçek API'ye karşı uçtan uca tarama (konsola özet basar) |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Veritabanı, kimlik doğrulama veya ortam değişkeni gerekmez. Kullanıcı ayarları tarayıcının `localStorage`'ında tutulur.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Teknoloji
 
-## Learn More
+Next.js 16 (App Router, Cache Components), React 19, TypeScript strict, Tailwind CSS v4, shadcn/ui (Base UI), Lucide, TanStack Table v9, TanStack Query v5, Zod v4, Recharts, Vitest.
 
-To learn more about Next.js, take a look at the following resources:
+## Veri kaynakları
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Kaynak | Kullanım |
+| --- | --- |
+| [Albion Online Data Project](https://www.albion-online-data.com/) — `https://europe.albion-online-data.com` (ayrıca `west`, `east`) | Güncel fiyatlar, geçmiş, emir defteri |
+| `GET /api/v2/stats/prices/{ids}.json?locations=` | Şehir × kalite başına en düşük satış / en yüksek alış emri ve görülme zamanları |
+| `GET /api/v2/stats/history/{ids}.json?time-scale=24&date=` | Günlük `item_count` (hacim) ve `avg_price` — likidite, oynaklık, anomali tespiti |
+| `GET /api/v2/stats/orderbook/{ids}.json` | Fiyat seviyesi başına emir miktarı — anında işlemlerde derinlik kontrolü |
+| [ao-data/ao-bin-dumps](https://github.com/ao-data/ao-bin-dumps) `formatted/items.json` + `items.json` | Item ID ↔ isim (TR/EN), tier, enchant, kategori, ağırlık, maksimum kalite |
+| ao-bin-dumps `cluster/world.xml`, `cluster/TNL-*.cluster.xml`, `templates/NONE/*.template.xml` | Avalon Yolları: bölge adı/tipi/tier'ı, sandık doğma noktaları, zindan girişleri, kaynak dağılımı |
+| `https://render.albiononline.com/v1/item/{id}.png` | Item ikonları |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Endpoint'ler, parametreler ve yanıt formatları uygulamadan önce gerçek isteklerle ve `/api/v2/swagger_doc` üzerinden doğrulandı.
 
-## Deploy on Vercel
+## Mimari
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+scripts/build-catalog.ts      ao-bin-dumps → src/data/catalog.json (repo'da, runtime'da GitHub'a istek yok)
+scripts/build-avalon.ts       ao-bin-dumps → src/data/avalon.json (Avalon Yolları bölge yapıları)
+src/lib/albion/               API katmanı: sabitler, Zod şemaları, batching, rate limiter, TTL cache, HTTP client
+src/lib/catalog/              Katalog erişimi + tarama evreni (universe.ts)
+src/lib/market/               Normalizasyon, hacim/oynaklık istatistikleri, emir defteri derinliği, sunucu servisi (service.ts)
+src/lib/profit/               Kâr motoru (4 senaryo) + ücret varsayımları
+src/lib/scanner/              Flipping ve şehirler arası tarayıcılar
+src/lib/scoring/              Çok kriterli skor, güven ve risk seviyesi
+src/lib/optimizer/            Bütçe sepeti
+src/lib/avalon/               Avalon XML ayrıştırıcıları (parse.ts) + arama/filtre (query.ts)
+src/lib/damage/               Photon (Protocol18) çözücü, kalibrasyon, hasar sayacı, sunucu servisi (damage meter)
+tools/albion-capture/         Windows paket yakalayıcı (tek dosya C#, Windows'un kendi derleyicisiyle derlenir)
+src/lib/opportunities.ts      Sunucu orkestrasyonu: snapshot → tarama → emir defteri → sepet
+src/app/api/*                 Route handler'lar (opportunities, items/[id], catalog/search, status)
+src/app/*, src/components/*   UI (tamamı client'tan yalnızca kendi API'mize istek atar)
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **İstemci asla Albion API'sine doğrudan istek atmaz.** Tarama sunucuda yapılır, istemciye yalnızca filtrelenmiş fırsatlar döner.
+- Hesaplama modülleri (`profit`, `scanner`, `scoring`, `optimizer`) saf fonksiyonlardır ve birim testlidir.
+
+## Rate limit ve cache stratejisi
+
+API kuralları (swagger'dan): **100 istek/dk ve 300 istek/5 dk** (IP başına), URL ≤ 4096 karakter, **sıkıştırma zorunlu** (gzip'siz istekler 1 istek/5 dk ile sınırlanır), 429'da `RateLimit-Reset` beklenmeli (yok sayan istemcilere 5 dk firewall ban).
+
+- Tüm istekler `Accept-Encoding: gzip, deflate, br` ile tek bir süreç-geneli **sliding-window limiter** üzerinden gider (90/dk, 270/5 dk, en fazla 3 eşzamanlı).
+- Item ID'leri URL ≤ 3900 karakter olacak şekilde **batch**'lenir (~165 item/istek). Varsayılan evren 5.732 item → 35 fiyat + 35 hacim isteği.
+- **429**: limiter `RateLimit-Reset` zamanına kadar tüm istekleri durdurur; bekleme ≤ 15 sn ise bir kez yeniden dener, aksi halde kullanıcıya geri sayımlı hata gösterilir. İstemci tarafı Query, 429 ve 4xx hatalarında otomatik tekrar denemez.
+- **Cache** (bellek içi, stale-while-revalidate, eşzamanlı istek tekilleştirme): fiyatlar 5 dk, hacim 60 dk, emir defteri 2 dk, ürün detayı 3 dk. Yenileme yalnızca uygulama kullanılırken tetiklenir; arka planda polling yoktur.
+- Kısmi hata: bazı paketler başarısız olursa kalanlarla devam edilir ve arayüzde `x/y paket` olarak gösterilir. Yenileme başarısız olursa eski veri uyarıyla sunulur.
+
+## Hesaplama modeli
+
+### Fiyat seçimi
+Yalnızca **en düşük satış emri** (`sell_price_min`) ve **en yüksek alış emri** (`buy_price_max`) kullanılır; `buy_price_min`/`sell_price_max` troll emirlerle doludur. `0` fiyat veya `0001-01-01` tarihi "veri yok" sayılır. Eşleşme her zaman **item ID (enchant dahil) + kalite** üzerinden birebirdir.
+
+| Senaryo | Alış fiyatı | Satış fiyatı | Ücretler |
+| --- | --- | --- | --- |
+| Anında Al → Satış Emri | kaynak en düşük satış | hedef en düşük satış − 1 | satış kurulum + relist + vergi |
+| Alış Emri → Satış Emri | kaynak en yüksek alış + 1 | hedef en düşük satış − 1 | alış kurulum + satış kurulum + relist + vergi |
+| Alış Emri → Anında Sat | kaynak en yüksek alış + 1 | hedef en yüksek alış | alış kurulum + vergi |
+| Anında Al → Anında Sat | kaynak en düşük satış | hedef en yüksek alış | vergi |
+
+Market flipping = aynı şehirde *Alış Emri → Satış Emri*. Her fırsat için başabaş satış fiyatı hesaplanır; zarar eden fırsatlar varsayılan olarak gizlenir.
+
+### Vergi varsayımları (doğrulanamadı)
+Resmi bir 2026 kaynağı bulunamadı; topluluk kaynaklarına dayanan varsayılanlar **Ayarlar** sayfasından değiştirilebilir:
+
+- Emir kurulum ücreti: **%2,5** (alış ve satış emri, iade edilmez)
+- Satış vergisi: **%4 Premium / %8 Premium yok** (satış emri dolduğunda ve anında satışta)
+- Anında alım: ücret yok
+- Yeniden listeleme: satış emri başına varsayılan **1** kez, her biri kurulum ücretini yeniden öder
+- Taşıma maliyeti (silver/kg) ve kapasite: API'de yok, isteğe bağlı kullanıcı girdisi
+
+Oyun içi market penceresinden kontrol edin.
+
+### Skor, güven ve risk
+Skor (0–100) şunların ağırlıklı toplamıdır: potansiyel net kâr (log ölçekli), ROI (%40'ta doyar, %150 üstü cezalı), likidite (gözlemlenen günlük hacim), güncellik, fiyat oynaklığı, sermaye kilitlenme süresi. Ek kurallar:
+
+- Hacim verisi yoksa skor en fazla 40, güven **Düşük**, önerilen adet en fazla 10.
+- Kullanılan fiyat 7 günlük ortalamanın %40'ının altında / 2 katının üstündeyse **Anomali**; ROI > %150 ise **Aşırı ROI** → skor yarıya iner, sepete alınmaz.
+- Veri yaşı sınırını aşan fiyatlar **güncel fırsat olarak gösterilmez** (isteğe bağlı "Eski veriyi göster").
+
+### Önerilen adet ve bütçe optimizer
+- Adet = min(risk bazlı bütçe payı, günlük hacmin %10–25'i × 2–5 gün (risk tercihine göre, emir tarafları arasında bölünür), taşıma kapasitesi, maks. yatırım filtresi).
+- Anında işlem adayları için emir defterinde fiyatın %3 yakınındaki derinlik kontrol edilir. Daha yeni bir fiyat gözleminden önce görülmüş seviyeler (muhtemelen dolmuş) sayılmaz.
+- Optimizer skor sırasıyla açgözlü dağıtır: ürün başına tek pozisyon, en fazla 12 pozisyon, pozisyon başına bütçe tavanı (Dengeli: düşük risk %25, orta %15, yüksek %8, hacimsiz %4). Tüm ücretler sermayeye dahildir. Toplam yatırım, tahmini kâr, kullanılmayan bütçe ve dokunulmayan sermaye gösterilir.
+- **Günlük kazanç tahmini üretilmez.**
+
+## Avalon Yolları
+
+`/avalon` sayfası bölge adıyla arama yapar ve her bölgenin sabit yapısını gösterir. Market verisinden bağımsızdır; Albion Data API'ye istek atmaz.
+
+- **Bölgeler:** `world.xml` içindeki etkin `TNL-*` kümeleri (400 bölge). Tier, küme dosya adından okunur (`..._T6_...`).
+- **Sandıklar:** Bölge dosyasındaki her şablon örneğinin *aktif katmanlarındaki* `SpawnPoint_LOOTCHEST_*_AVALON_ROAD_*` noktaları sayılır; boyut (küçük/orta), sınıf (standart/veteran/elit) ve tier ayrıştırılır.
+- **Zindanlar:** Aktif `DNG_(Solo|Group|Raid)_T#_<fraksiyon>` katmanları. Betik bu sayıyı bölgenin minimap zindan işaretleriyle karşılaştırır; uyuşmazlık %5'i aşarsa hata verir (dump formatı değişmiş demektir).
+- **Kaynaklar:** `world.xml` dağıtım tablosu; tier < 4 satırlar editör yer tutucusu olduğundan atılır.
+- **Gösterilmeyenler:** Sandık rengi (yeşil/mavi/altın) doğuşta sunucu tarafından belirlenir; bölgeler arası portal bağlantıları dinamiktir. İkisi de oyun dosyalarında yoktur ve oyun trafiğini dinlemeden öğrenilemez — bu uygulama bunu yapmaz.
+
+## Damage Meter
+
+`/damage` sayfası grubun verdiği hasarı, iyileştirmeyi ve aldığı hasarı oturum bazında gösterir. Hiçbir açık API'de hasar verisi yoktur (killboard yalnızca PvP ölümlerini içerir); tek kaynak oyun istemcisine gelen ağ trafiğidir.
+
+**Akış:** `tools/albion-capture/AlbionCapture.cs` (Windows, oyunun çalıştığı bilgisayar) → `POST /api/damage/ingest` → Photon çözücü (`src/lib/damage/photon.ts`, `protocol18.ts`; paket başlıkları big-endian, mesaj içeriği Protocol18: little-endian + zigzag varint) → hasar sayacı (`meter.ts`) → `/damage` sayfası (1 sn'de bir yenilenir).
+
+**Yakalayıcı** yalnızca oyun sunucusundan *gelen* UDP 5056 paketlerini Windows ham soketiyle (SIO_RCVALL) okur ve ham içeriği bu uygulamaya iletir. Oyuna paket göndermez, paket değiştirmez/engellemez, oyun sürecine veya dosyalarına dokunmaz. Npcap gerekmez; yönetici izni gerekir. Derleme (indirme gerektirmez):
+
+```
+C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /out:AlbionCapture.exe AlbionCapture.cs
+.\AlbionCapture.exe http://<uygulama-ip>:3100   # PowerShell'de baştaki .\ gerekli
+```
+
+**Otomatik kalibrasyon (varsayılan):** Oyun yamaları olay numaralarını değiştirebildiğinden kodlar sabit yazılmaz. `auto-calibrator.ts` son 3 dakikanın çözülmüş mesajlarını tutar ve `calibrate.ts` ile analiz eder:
+- *Kimlik kuralları:* karakter adına benzeyen bir string (3–16 harf/rakam) ile **long** tipinde bir nesne kimliğini birlikte taşıyan mesajlar. Gerçek trafikte kimlikler hep compressed long olarak gelir; aynı mesajdaki int/byte sayaçlar böylece elenir. Her mesaj tipinden tek kural seçilir: kimliği en çok vuruşta görülen anahtar, isim olarak da kimliğe göre benzersiz olan anahtar (lonca adı birden çok oyuncuda tekrarlanır).
+- *Can değişimi kuralı:* bu kimliklerden birini vuran olarak ve bir ondalık değeri taşıyan olay. Sıralama, anahtar 0'daki öznenin oyuncu değil mob olmasına göre yapılır; enerji/mana gibi benzer olaylar böylece geriye düşer.
+- Ayar yalnızca kanıt netse uygulanır (en az 15 mob vuruşu ve ikinci adayın en az iki katı). Uygulanınca tampondaki trafik yeniden işlenir; kalibrasyondan önceki vuruşlar kaybolmaz. Mevcut ayar vuruş eşleştirmeye devam ettiği sürece korunur, eşleşme kesilirse (yama) kendiliğinden yenilenir. Doğrulandığı hali (Europe, Kasım 2026): `event:6`, vuran anahtar 6, değişim 2, hedef 0; kendi karakterin `response:2` anahtar 2.
+- Elle kalibrasyon (kayıt al → adayları seç) "Gelişmiş" altında durur.
+
+**Otomatik oturum:** İlk oyuncu vuruşunda başlar; ayarlanan süre (varsayılan 5 dk) boyunca oyuncu vuruşu/iyileştirmesi olmazsa son etkinlik anında kapanıp kaydedilir. 10 vuruştan kısa otomatik oturumlar atılır. Zamanlar yakalayıcının (Windows) saatine göredir. Ayarlar `.data/damage/settings.json` dosyasındadır.
+
+**Sayım kuralları:** negatif değişim + oyuncu neden → verilen hasar; pozitif değişim + oyuncu neden → iyileştirme (kendine iyileştirme hariç; fazla iyileştirme dahil olabilir); hedef oyuncuysa → alınan hasar. Sahibi eşleşmeyen hasar (pet, ismi yakalanmadan bölgeye girmiş oyuncu) "eşleşmeyen" olarak ayrı tutulur. Nesne kimlikleri bölge değişiminde yenilendiği için kimlik eşlemesi sürekli güncellenir.
+
+**Veri:** Oturumlar `.data/damage/sessions/*.json`, ayar `config.json` / `settings.json`, kalibrasyon kayıtları `.data/damage/captures/*.jsonl` (hepsi gitignore'da). Hiçbir veri dışarı gönderilmez.
+
+**Sınırlar ve riskler:**
+- Yakalayıcının çalıştığı istemcinin gördüğü kadar: görüş menzili dışındaki grup üyelerinin vuruşları eksik kalabilir.
+- Şifreli Photon mesajları çözülemez ve sayılır ("Çözülemeyen").
+- VPN/ExitLag gibi araçlar trafiği farklı bir arayüzden geçirebilir; yakalayıcı tüm IPv4 arayüzlerini dinler ama garanti edilemez.
+- `/api/damage/ingest` yerel ağa açıktır ve kimlik doğrulaması yoktur; uygulamayı güvenilir ağda çalıştırın.
+- Sandbox Interactive'in yalnızca okuyan araçlara göz yumduğu bilinse de resmi bir garanti yoktur; kullanım riski kullanıcıya aittir.
+- C# yakalayıcı macOS'ta derlenemez; Windows'ta (yerleşik `csc.exe`) derlenip gerçek oyunla denendi.
+- Parti üyeleri otomatik algılanmaz; tabloda bölgede vuran tüm oyuncular görünür, isteğe bağlı isim filtresi vardır.
+
+## Sınırlamalar
+
+- Veriler, Albion Data Client çalıştıran oyuncuların gördüğü kadardır: kapsama eksik, gecikmeli ve şehre göre değişken olabilir. History `item_count` gerçek hacmin alt sınırıdır.
+- Emir defteri endpoint'i eski seviyeleri bir süre tutabilir; uygulama bunları daha yeni fiyat gözlemleriyle karşılaştırarak eler ama tam doğruluk garanti edilemez.
+- Vergi/ücret oranları ve relist sayısı varsayımdır. Taşıma süresi ve riski API'de yoktur.
+- Tarama evreni (`src/lib/catalog/universe.ts`): T4–T8 kaynaklar ve işlenmiş kaynaklar, ekipman/çanta/pelerin (enchant ≤ 3), iksir ve yemekler, temel binekler. Artefaktlar ve T1–T3 hariçtir. Diğer ürünler detay sayfasında görüntülenebilir ancak otomatik taranmaz.
+- Caerleon, Brecilien ve Black Market güvenli rota hesaplarına dahil değildir.
+- Cache süreç belleğindedir; çoklu sunucu (serverless/çok instance) dağıtımında her instance kendi limit sayacını tutar. Tek süreçli kullanım için tasarlanmıştır.
+
+## Test
+
+```bash
+npm test
+```
+
+Kapsam: kâr motoru (4 senaryo, Premium/Premium yok, başabaş, relist, taşıma), normalizasyon (boş/sentinel tarih, UTC, şehir eşleme, troll emir), hacim istatistikleri, batching (URL limiti), HTTP client (gzip başlığı, 429 bekle-tekrar dene ve duraklatma, HTTP/JSON hataları), rate limiter, cache (SWR, hata davranışı), tarayıcılar (kalite/enchant eşleşmesi, eski veri, eksik taraf, hacimsiz ürün, anomali, kapasite/yatırım limitleri), skor (yüksek ROI'li illikit ürün < likit ürün), optimizer (çeşitlendirme, ücretler, derinlik limiti), emir defteri derinliği.
