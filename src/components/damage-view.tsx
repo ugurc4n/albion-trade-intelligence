@@ -20,8 +20,9 @@ import {
   WifiOff,
 } from "lucide-react";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
-import { Pill } from "@/components/badges";
+import { Pill, TierBadge, WithTip } from "@/components/badges";
 import { FieldLabel, NativeSelect } from "@/components/filters-bar";
+import { ItemIcon } from "@/components/item-icon";
 import { PageHeader, Panel } from "@/components/page-parts";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/states";
 import { Button } from "@/components/ui/button";
@@ -112,6 +113,22 @@ function Disclosure({ title, children, defaultOpen = false }: { title: ReactNode
 
 /* ---------- player table ---------- */
 
+function MainHandCell({ player }: { player: PlayerStats }) {
+  const observation = player.mainHand;
+  if (!observation) return <span className="text-xs text-muted-foreground" title="Main Hand bilgisi henüz alınmadı.">Bilinmiyor</span>;
+  const item = observation.item;
+  if (!item) return <span lang="en" className="text-xs text-muted-foreground">Unarmed</span>;
+  return (
+    <div className="flex items-center gap-2" title={`Son görülen Main Hand: ${item.nameEn} · T${item.tier}.${item.enchant}`}>
+      <ItemIcon key={item.id} itemId={item.id} size={28} />
+      <div className="min-w-0">
+        <span lang="en" className="block max-w-44 truncate text-xs">{item.nameEn}</span>
+        <TierBadge tier={item.tier} enchant={item.enchant} />
+      </div>
+    </div>
+  );
+}
+
 function PlayerTable({
   session,
   now,
@@ -142,10 +159,13 @@ function PlayerTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] text-[13px]">
+      <table className="w-full min-w-[840px] text-[13px]">
         <thead>
           <tr className="border-b border-border text-left text-[11px] tracking-wide text-muted-foreground uppercase">
             <th className="px-3 py-2 font-medium">Oyuncu</th>
+            <th lang="en" className="px-3 py-2 font-medium">
+              <WithTip tip="Son görülen Main Hand. Ekipman paketi geldikçe güncellenir.">Main Hand</WithTip>
+            </th>
             <th lang="en" className="px-3 py-2 text-right font-medium">Damage</th>
             <th className="w-[28%] px-3 py-2 font-medium">Pay</th>
             <th lang="en" className="px-3 py-2 text-right font-medium">DPS</th>
@@ -165,6 +185,7 @@ function PlayerTable({
                   <span className="font-medium">{p.name}</span>
                   {isSelf && <span className="ml-1.5 text-[11px] text-fuchsia-300">sen</span>}
                 </td>
+                <td className="px-3 py-2"><MainHandCell player={p} /></td>
                 <td className="num px-3 py-2 text-right">{formatSilver(p.damage)}</td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-2">
@@ -792,7 +813,7 @@ export function DamageView() {
               Sayılar, yakalayıcının çalıştığı oyuncunun istemcisine gelen olaylardır: görüş menzili dışındaki party üyelerinin vuruşları
               eksik olabilir. Pet/summon damage&apos;i &quot;eşleşmeyen&quot; olarak ayrı gösterilir. Self-healing ve
               PvP damage, Damage toplamına sayılmaz. Healing, overhealing içerebilir. Çok kısa (10 vuruştan az)
-              otomatik oturumlar kaydedilmez.
+              otomatik oturumlar kaydedilmez. Main Hand sütunu son görülen ekipmanı gösterir; silah değiştikçe güncellenir.
             </p>
           </>
         )}

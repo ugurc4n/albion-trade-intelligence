@@ -148,6 +148,8 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /out:AlbionCaptu
 
 **Sayım kuralları:** negatif değişim + oyuncu neden → verilen hasar; pozitif değişim + oyuncu neden → iyileştirme (kendine iyileştirme hariç; fazla iyileştirme dahil olabilir); hedef oyuncuysa → alınan hasar. Sahibi eşleşmeyen hasar (pet, ismi yakalanmadan bölgeye girmiş oyuncu) "eşleşmeyen" olarak ayrı tutulur. Nesne kimlikleri bölge değişiminde yenilendiği için kimlik eşlemesi sürekli güncellenir.
 
+**Main Hand:** Oyuncu satırında son görülen Main Hand ikonu, İngilizce item adı ve Tier/Enchantment gösterilir; ekipman değişimi geldiğinde güncellenir ve oturumla kaydedilir. Bu alan Damage toplamını silahlar arasında bölmez. Ekipman paketi henüz gelmediyse veya item index eşleşmiyorsa "Bilinmiyor", slot boşsa "Unarmed" görünür. Eski oturumlar ekipman bilgisi olmadan açılabilir. Ekipman düzeni mevcut paket kayıtlarıyla doğrulanmıştır (`NewCharacter` key 40, `CharacterEquipmentChanged` event 90/key 2, Main Hand slot 0); oyun yamalarında event kodu ve catalog index eşlemesi tekrar kontrol edilmelidir (`npm run catalog`).
+
 **Veri:** Oturumlar `.data/damage/sessions/*.json`, ayar `config.json` / `settings.json`, kalibrasyon kayıtları `.data/damage/captures/*.jsonl` (hepsi gitignore'da). Hiçbir veri dışarı gönderilmez.
 
 **Sınırlar ve riskler:**

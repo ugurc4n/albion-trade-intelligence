@@ -42,8 +42,16 @@ export type IdentityRule = z.infer<typeof identityRuleSchema>;
 export type HealthRule = z.infer<typeof healthRuleSchema>;
 export type DamageConfig = z.output<typeof damageConfigSchema>;
 
+/** Last observed Main Hand. A null item means an explicitly empty slot (Unarmed). */
+export type MainHandObservation = {
+  item: { id: string; nameEn: string; tier: number; enchant: number } | null;
+  observedAt: number;
+};
+
 export type PlayerStats = {
   name: string;
+  /** Missing/null means unknown; optional so saved sessions from older versions still load. */
+  mainHand?: MainHandObservation | null;
   /** Damage dealt by this player (sum of negative health changes they caused on others). */
   damage: number;
   /** Healing done (positive health changes caused on others; may include overheal). */

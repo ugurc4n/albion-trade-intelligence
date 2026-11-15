@@ -5,12 +5,17 @@ type CatalogFile = { generatedAt: string; source: string; items: CatalogItem[] }
 
 const catalog = catalogJson as CatalogFile;
 const byId = new Map<string, CatalogItem>(catalog.items.map((item) => [item.id, item]));
+const byIndex = new Map<number, CatalogItem>(catalog.items.filter((item) => item.index !== undefined).map((item) => [item.index!, item]));
 
 export const CATALOG_GENERATED_AT = catalog.generatedAt;
 export const CATALOG_SOURCE = catalog.source;
 
 export function getCatalogItem(id: string): CatalogItem | undefined {
   return byId.get(id);
+}
+
+export function getCatalogItemByIndex(index: number): CatalogItem | undefined {
+  return byIndex.get(index);
 }
 
 export function allCatalogItems(): readonly CatalogItem[] {

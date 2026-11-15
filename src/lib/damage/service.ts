@@ -32,7 +32,7 @@ const MAX_RECORDING_PACKETS = 60_000;
 const MAX_RECORDING_MS = 10 * 60_000;
 const CONNECTED_WINDOW_MS = 5_000;
 /** Bump when the shape of the service changes, so dev hot-reloads do not keep a stale singleton. */
-const SERVICE_VERSION = 4;
+const SERVICE_VERSION = 5;
 
 export type RawPacket = { t: number; d: string };
 

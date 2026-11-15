@@ -1,6 +1,7 @@
 import { expandRows, isIdTag, isObjectIdLike } from "./extract";
+import { EQUIPMENT_CHANGED_EVENT, readMainHand } from "./equipment";
 import { messageSignature, type PhotonMessage } from "./photon";
-import type { DamageConfig, PlayerStats, SessionRecord } from "./types";
+import type { DamageConfig, MainHandObservation, PlayerStats, SessionRecord } from "./types";
 
 const MAX_IDENTITIES = 5000;
 /** Sanity bound: a single health change beyond this is treated as corrupt data, not damage. */
@@ -23,7 +24,7 @@ const DEFAULT_OPTIONS: MeterOptions = {
 };
 
 function emptyStats(name: string): PlayerStats {
-  return { name, damage: 0, heal: 0, taken: 0, hits: 0, firstAt: null, lastAt: null };
+  return { name, mainHand: null, damage: 0, heal: 0, taken: 0, hits: 0, firstAt: null, lastAt: null };
 }
 
 function autoLabel(at: number): string {
@@ -37,8 +38,10 @@ function autoLabel(at: number): string {
  */
 export class DamageMeter {
   private identities = new Map<number, string>();
+  private equipment = new Map<number, { mainHand: MainHandObservation | null; at: number }>();
   private session: SessionRecord | null = null;
   private players = new Map<string, PlayerStats>();
+  private playerEquipmentAt = new Map<string, number>();
   private lastActivityAt: number | null = null;
   private options: MeterOptions;
   /** Own character: learned from identity rules carried by operation responses (the join reply). */
@@ -82,6 +85,7 @@ export class DamageMeter {
 
   startSession(id: string, label: string, now: number, auto = false): SessionRecord {
     this.players = new Map();
+    this.playerEquipmentAt = new Map();
     this.lastActivityAt = null;
     this.session = {
       id,
@@ -102,6 +106,7 @@ export class DamageMeter {
     const done = this.snapshot();
     this.session = null;
     this.players = new Map();
+    this.playerEquipmentAt = new Map();
     this.lastActivityAt = null;
     return done;
   }
@@ -124,12 +129,19 @@ export class DamageMeter {
     if (!this.session) return null;
     return {
       ...this.session,
-      players: [...this.players.values()].map((p) => ({ ...p })).sort((a, b) => b.damage - a.damage),
+      players: [...this.players.values()].map((p) => ({
+        ...p,
+        mainHand: p.mainHand ? { ...p.mainHand, item: p.mainHand.item ? { ...p.mainHand.item } : null } : null,
+      })).sort((a, b) => b.damage - a.damage),
     };
   }
 
-  /** Learns object id → name mappings only (no damage counting) — used when replaying old traffic. */
+  /** Learns player identities and equipment without counting damage — also used for traffic replay. */
   learnIdentities(msg: PhotonMessage) {
+    if (msg.kind === "event" && msg.code === EQUIPMENT_CHANGED_EVENT) {
+      const id = msg.params.get(0);
+      if (isObjectIdLike(id) && isIdTag(msg.types.get(0))) this.learnEquipment(id, readMainHand(msg, 2), msg.at);
+    }
     const config = this.config;
     if (!config) return;
     const sig = messageSignature(msg);
@@ -139,15 +151,16 @@ export class DamageMeter {
       const id = msg.params.get(rule.idKey);
       if (typeof name === "string" && name.length > 0 && isObjectIdLike(id) && isIdTag(msg.types.get(rule.idKey))) {
         this.learn(id, name);
+        if (msg.kind === "event" && rule.nameKey === 1) this.learnEquipment(id, readMainHand(msg, 40), msg.at);
         if (msg.kind === "response") this.self = name;
       }
     }
   }
 
   handle(msg: PhotonMessage) {
+    this.learnIdentities(msg);
     const config = this.config;
     if (!config) return;
-    this.learnIdentities(msg);
     const sig = messageSignature(msg);
 
     const h = config.health;
@@ -173,19 +186,19 @@ export class DamageMeter {
       if (!session) continue;
 
       if (change < 0) {
-        if (targetName && !self) this.stats(targetName).taken += -change;
+        if (targetName && !self) this.stats(targetName, Number(target), msg.at).taken += -change;
         if (self || targetName) continue; // player-on-player or self damage is not counted as dealt damage
         if (!causerName) {
           session.unattributedDamage += -change;
           continue;
         }
-        const p = this.stats(causerName);
+        const p = this.stats(causerName, Number(causer), msg.at);
         p.damage += -change;
         p.hits++;
         p.firstAt ??= msg.at;
         p.lastAt = msg.at;
       } else if (causerName && !self) {
-        const p = this.stats(causerName);
+        const p = this.stats(causerName, Number(causer), msg.at);
         p.heal += change;
         p.firstAt ??= msg.at;
         p.lastAt = msg.at;
@@ -196,17 +209,41 @@ export class DamageMeter {
 
   private learn(id: number, name: string) {
     if (this.identities.get(id) === name) return;
+    // A reused object id must not lend the previous player's weapon to the new player.
+    if (this.identities.has(id)) this.equipment.delete(id);
     this.identities.delete(id);
     this.identities.set(id, name);
-    if (this.identities.size > MAX_IDENTITIES) this.identities.delete(this.identities.keys().next().value!);
+    if (this.identities.size > MAX_IDENTITIES) {
+      const oldest = this.identities.keys().next().value!;
+      this.identities.delete(oldest);
+      this.equipment.delete(oldest);
+    }
   }
 
-  private stats(name: string): PlayerStats {
+  private learnEquipment(id: number, mainHand: MainHandObservation | null | undefined, at: number) {
+    if (mainHand === undefined || at < (this.equipment.get(id)?.at ?? -Infinity)) return;
+    this.equipment.delete(id);
+    this.equipment.set(id, { mainHand, at });
+    if (this.equipment.size > MAX_IDENTITIES) this.equipment.delete(this.equipment.keys().next().value!);
+    const name = this.identities.get(id);
+    const player = name ? this.players.get(name) : undefined;
+    if (player) this.applyEquipment(player, mainHand, at);
+  }
+
+  private applyEquipment(player: PlayerStats, mainHand: MainHandObservation | null, at: number) {
+    if (at < (this.playerEquipmentAt.get(player.name) ?? -Infinity)) return;
+    player.mainHand = mainHand;
+    this.playerEquipmentAt.set(player.name, at);
+  }
+
+  private stats(name: string, objectId: number, at: number): PlayerStats {
     let p = this.players.get(name);
     if (!p) {
       p = emptyStats(name);
       this.players.set(name, p);
     }
+    const equipment = this.equipment.get(objectId);
+    this.applyEquipment(p, equipment?.mainHand ?? null, equipment?.at ?? at);
     return p;
   }
 }

@@ -1,5 +1,7 @@
 export type CatalogItem = {
   id: string;
+  /** Numeric game item type carried by equipment packets; absent in older catalogs. */
+  index?: number;
   nameEn: string;
   nameTr: string;
   tier: number;

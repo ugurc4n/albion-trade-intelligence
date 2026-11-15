@@ -16,6 +16,7 @@ const CACHE_DIR = path.join(process.cwd(), ".cache", "ao-bin-dumps");
 const OUT_FILE = path.join(process.cwd(), "src", "data", "catalog.json");
 
 type FormattedItem = {
+  Index: string;
   UniqueName: string;
   LocalizedNames: Record<string, string> | null;
 };
@@ -97,8 +98,12 @@ async function main() {
     const nameTr = f.LocalizedNames?.["TR-TR"] ?? nameEn;
     const maxQuality = Number(str(raw["@maxqualitylevel"]) ?? 1);
 
+    const index = Number(f.Index);
+    if (!Number.isSafeInteger(index) || index <= 0) throw new Error(`Invalid game item index for ${id}: ${f.Index}`);
+
     items.push({
       id,
+      index,
       nameEn,
       nameTr,
       tier,
@@ -124,6 +129,7 @@ async function main() {
 
 type CatalogEntry = {
   id: string;
+  index: number;
   nameEn: string;
   nameTr: string;
   tier: number;
