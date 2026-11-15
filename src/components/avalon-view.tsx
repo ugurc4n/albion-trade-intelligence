@@ -30,13 +30,13 @@ const PAGE_SIZE = 40;
 
 const TIER_OPTIONS = [4, 6, 8].map((t) => ({ value: t, label: `T${t}` }));
 const GRADE_OPTIONS: { value: ChestGrade; label: string }[] = [
-  { value: "elite", label: "Elit sandık" },
-  { value: "veteran", label: "Veteran sandık" },
+  { value: "elite", label: "Elite Chest" },
+  { value: "veteran", label: "Veteran Chest" },
 ];
 const DUNGEON_OPTIONS: { value: DungeonKind; label: string }[] = [
   { value: "solo", label: "Solo" },
-  { value: "group", label: "Grup" },
-  { value: "avalonian", label: "Avalon (elit)" },
+  { value: "group", label: "Group" },
+  { value: "avalonian", label: "Avalonian (Elite)" },
 ];
 
 const GRADE_TONE: Record<ChestGrade, string> = {
@@ -52,16 +52,15 @@ const DUNGEON_TONE: Record<DungeonKind, string> = {
 };
 
 function chestLabel(c: AvalonChest): string {
-  const grade = c.grade === "standard" ? "" : ` ${CHEST_GRADE_LABELS[c.grade].toLowerCase()}`;
+  const grade = c.grade === "standard" ? "" : ` ${CHEST_GRADE_LABELS[c.grade]}`;
   return `${CHEST_SIZE_LABELS[c.size]}${grade} T${c.tier}`;
 }
 
 function dungeonLabel(d: AvalonDungeon): string {
-  const kind = d.kind === "solo" ? "Solo" : d.kind === "group" ? "Grup" : "Avalon";
-  return `${kind} T${d.tier} · ${FACTION_LABELS[d.faction] ?? d.faction}`;
+  return `${DUNGEON_KIND_LABELS[d.kind]} T${d.tier} · ${FACTION_LABELS[d.faction] ?? d.faction}`;
 }
 
-/** ORE T4×3, T5×2, T6×3 → "Maden T4–T6 (8)" */
+/** ORE T4×3, T5×2, T6×3 → "Ore T4–T6 (8)" */
 function resourceSummary(resources: AvalonResource[]): { type: string; label: string; nodes: number }[] {
   const byType = new Map<string, AvalonResource[]>();
   for (const r of resources) byType.set(r.type, [...(byType.get(r.type) ?? []), r]);
@@ -94,11 +93,11 @@ function ZoneCard({ zone }: { zone: AvalonZone }) {
       </header>
 
       <section className="space-y-1.5">
-        <h4 className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-          <Gem className="size-3.5" aria-hidden /> Sandıklar <span className="num normal-case">({chestCount})</span>
+        <h4 lang="en" className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+          <Gem className="size-3.5" aria-hidden /> Chests <span className="num normal-case">({chestCount})</span>
         </h4>
         {zone.chests.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Sandık noktası yok</p>
+          <p className="text-xs text-muted-foreground">Chest noktası yok</p>
         ) : (
           <div className="flex flex-wrap gap-1">
             {zone.chests.map((c) => (
@@ -111,11 +110,11 @@ function ZoneCard({ zone }: { zone: AvalonZone }) {
       </section>
 
       <section className="space-y-1.5">
-        <h4 className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-          <Skull className="size-3.5" aria-hidden /> Zindanlar <span className="num normal-case">({dungeonCount})</span>
+        <h4 lang="en" className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+          <Skull className="size-3.5" aria-hidden /> Dungeons <span className="num normal-case">({dungeonCount})</span>
         </h4>
         {zone.dungeons.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Zindan girişi yok</p>
+          <p className="text-xs text-muted-foreground">Dungeon girişi yok</p>
         ) : (
           <div className="flex flex-wrap gap-1">
             {zone.dungeons.map((d) => (
@@ -128,8 +127,8 @@ function ZoneCard({ zone }: { zone: AvalonZone }) {
       </section>
 
       <section className="space-y-1.5">
-        <h4 className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-          <Trees className="size-3.5" aria-hidden /> Kaynaklar
+        <h4 lang="en" className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+          <Trees className="size-3.5" aria-hidden /> Resources
         </h4>
         {resources.length === 0 ? (
           <p className="text-xs text-muted-foreground">Veri bulunamadı</p>
@@ -138,7 +137,7 @@ function ZoneCard({ zone }: { zone: AvalonZone }) {
             {resources.map((r) => (
               <li key={r.type} className="flex justify-between gap-2">
                 <span>{r.label}</span>
-                <span className="num text-muted-foreground">{r.nodes} düğüm</span>
+                <span className="num text-muted-foreground">{r.nodes} node</span>
               </li>
             ))}
           </ul>
@@ -169,8 +168,8 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
   return (
     <div className="pb-8">
       <PageHeader section="avalon"
-        title="Avalon Yolları"
-        description="Bölge adını yaz, içindeki sandık noktalarını, zindan girişlerini ve kaynak düğümlerini gör. Veriler oyunun statik harita dosyalarından üretilir; Albion Data API'ye istek atılmaz."
+        title="Roads of Avalon"
+        description="Zone adını yaz, içindeki Chest noktalarını, Dungeon girişlerini ve Resource Node sayılarını gör. Veriler oyunun statik harita dosyalarından üretilir; Albion Data API'ye istek atılmaz."
       />
 
       <div className="space-y-3 px-3 lg:px-4">
@@ -178,16 +177,14 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
           <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
           <div className="space-y-1">
             <p>
-              <span className="font-medium text-foreground">Avalon Yolları tam yağma (full loot) bölgesidir.</span>{" "}
+              <span className="font-medium text-foreground">Roads of Avalon, full-loot PvP bölgesidir.</span>{" "}
               <span className="text-muted-foreground">
                 Profilin güvenli ticarete göre ayarlı; bu sayfa yalnızca bilgi amaçlıdır.
               </span>
             </p>
             <p className="text-muted-foreground">
-              Gösterilenler bölgenin sabit yapısıdır. <span className="text-foreground">Sandığın rengi</span> (yeşil / mavi / altın)
-              her doğuşta oyun sunucusunca belirlenir ve <span className="text-foreground">portal bağlantıları</span> birkaç saatte bir
-              değişir; bu bilgiler oyun dosyalarında yoktur ve gösterilmez. Sandık sayıları olası doğma noktalarıdır, o an açık sandık
-              olduğu anlamına gelmez.
+              Gösterilenler Zone&apos;un sabit yapısıdır. Chest&apos;lerin canlı durumu ve <span className="text-foreground">Portal bağlantıları</span>
+              {" "}bu sayfada gösterilmez. Chest sayıları olası doğma noktalarıdır, o an açılabilir Chest olduğu anlamına gelmez.
             </p>
           </div>
         </div>
@@ -195,7 +192,7 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
         <Panel>
           <div className="flex flex-wrap items-end gap-x-4 gap-y-3 p-3">
             <label className="flex min-w-60 flex-1 flex-col gap-1">
-              <FieldLabel>Bölge adı</FieldLabel>
+              <FieldLabel>Zone adı</FieldLabel>
               <div className="relative">
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
                 <Input
@@ -204,31 +201,31 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
                   onChange={(e) => update({ query: e.target.value })}
                   placeholder="ör. Ouyos-Aoeuam"
                   className="h-8 pl-8 text-[13px]"
-                  aria-label="Bölge adı ara"
+                  aria-label="Zone adı ara"
                 />
               </div>
             </label>
             <div className="flex flex-col gap-1">
-              <FieldLabel>Tier</FieldLabel>
+              <FieldLabel lang="en">Tier</FieldLabel>
               <Chips label="Tier" options={TIER_OPTIONS} value={filters.tiers} onChange={(tiers) => update({ tiers })} />
             </div>
             <div className="flex flex-col gap-1">
-              <FieldLabel>Sandık</FieldLabel>
-              <Chips label="Sandık" options={GRADE_OPTIONS} value={filters.chestGrades} onChange={(chestGrades) => update({ chestGrades })} />
+              <FieldLabel lang="en">Chest</FieldLabel>
+              <Chips label="Chest" options={GRADE_OPTIONS} value={filters.chestGrades} onChange={(chestGrades) => update({ chestGrades })} />
             </div>
             <div className="flex flex-col gap-1">
-              <FieldLabel>Zindan</FieldLabel>
+              <FieldLabel lang="en">Dungeon</FieldLabel>
               <Chips
-                label="Zindan"
+                label="Dungeon"
                 options={DUNGEON_OPTIONS}
                 value={filters.dungeonKinds}
                 onChange={(dungeonKinds) => update({ dungeonKinds })}
               />
             </div>
             <label className="flex flex-col gap-1">
-              <FieldLabel>Bölge tipi</FieldLabel>
+              <FieldLabel>Zone tipi</FieldLabel>
               <NativeSelect
-                label="Bölge tipi"
+                label="Zone tipi"
                 value={filters.types[0] ?? ""}
                 onChange={(v) => update({ types: v ? [v] : [] })}
                 className="w-44"
@@ -251,7 +248,7 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>
-            <span className="num text-foreground">{results.length}</span> / <span className="num">{zones.length}</span> bölge
+            <span className="num text-foreground">{results.length}</span> / <span className="num">{zones.length}</span> Zone
           </span>
           <span>
             Kaynak: ao-bin-dumps oyun dosyaları · üretildi <span className="num">{generatedAt.slice(0, 10)}</span>
@@ -262,8 +259,8 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
           <Panel>
             <EmptyState title="Veri bulunamadı">
               {filters.query
-                ? `"${filters.query}" adında bir Avalon bölgesi yok. Adı oyundaki gibi yazdığından emin ol (büyük/küçük harf ve tire önemli değil).`
-                : "Filtrelere uyan bölge yok."}
+                ? `"${filters.query}" adında bir Roads of Avalon Zone'u yok. Adı oyundaki gibi yazdığından emin ol (büyük/küçük harf ve tire önemli değil).`
+                : "Filtrelere uyan Zone yok."}
             </EmptyState>
           </Panel>
         ) : (
@@ -284,9 +281,9 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
         )}
 
         <p className="text-[11px] leading-relaxed text-muted-foreground/80">
-          {DUNGEON_KIND_LABELS.solo}, {DUNGEON_KIND_LABELS.group.toLowerCase()} ve {DUNGEON_KIND_LABELS.avalonian.toLowerCase()} girişleri
-          bölgenin harita işaretleriyle karşılaştırılarak doğrulanmıştır. Kaynak düğüm sayıları oyunun dağıtım tablosundan gelir; düğümler
-          toplandıktan sonra yeniden doğana kadar boş olabilir.
+          {DUNGEON_KIND_LABELS.solo}, {DUNGEON_KIND_LABELS.group} ve {DUNGEON_KIND_LABELS.avalonian} girişleri
+          Zone&apos;un harita işaretleriyle karşılaştırılarak doğrulanmıştır. Resource Node sayıları oyunun dağıtım tablosundan gelir;
+          Node&apos;lar toplandıktan sonra yeniden doğana kadar boş olabilir.
         </p>
       </div>
     </div>

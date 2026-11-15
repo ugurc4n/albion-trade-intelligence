@@ -25,10 +25,10 @@ export function toRoyalCity(location: string): City | null {
 
 export const QUALITY_LABELS: Record<number, string> = {
   1: "Normal",
-  2: "İyi",
-  3: "Seçkin",
-  4: "Mükemmel",
-  5: "Başyapıt",
+  2: "Good",
+  3: "Outstanding",
+  4: "Excellent",
+  5: "Masterpiece",
 };
 
 /** Rate limits published at /api/v2/swagger_doc: 100 req/min and 300 req/5 min per IP. We keep a safety margin. */

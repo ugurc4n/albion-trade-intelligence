@@ -18,7 +18,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
     }
     const item = getCatalogItem(id);
     if (!item) {
-      return Response.json({ error: { kind: "not_found", message: "Ürün katalogda bulunamadı." } }, { status: 404 });
+      return Response.json({ error: { kind: "not_found", message: "Item katalogda bulunamadı." } }, { status: 404 });
     }
     const detail = await getItemDetail(server, id);
     return Response.json({ item, server, inScanUniverse: isInUniverse(id), ...detail });

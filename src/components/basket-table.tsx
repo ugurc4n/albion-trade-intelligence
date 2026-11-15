@@ -12,7 +12,7 @@ const LIMIT_LABELS: Record<BasketLine["limitedBy"][number], string> = {
   budget_share: "Risk bazlı bütçe payı",
   remaining_budget: "Kalan bütçe",
   liquidity: "Likidite (hacim)",
-  orderbook_depth: "Emir defteri derinliği",
+  orderbook_depth: "Order Book derinliği",
 };
 
 export function BasketTable({ basket, compact }: { basket: Basket; compact?: boolean }) {
@@ -21,7 +21,7 @@ export function BasketTable({ basket, compact }: { basket: Basket; compact?: boo
       <table className="w-full text-[13px]">
         <thead className="bg-surface">
           <tr className="border-b border-border text-[11px] tracking-wide text-muted-foreground uppercase">
-            <th className="h-8 px-2 text-left font-medium">Ürün</th>
+            <th className="h-8 px-2 text-left font-medium">Item</th>
             <th className="px-2 text-left font-medium">İşlem</th>
             <th className="px-2 text-right font-medium">Adet</th>
             {!compact && <th className="px-2 text-right font-medium">Alış</th>}

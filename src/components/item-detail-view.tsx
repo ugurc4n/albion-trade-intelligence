@@ -82,7 +82,7 @@ function HistoryCharts({ series, quality }: { series: HistorySeries[]; quality: 
   const { max: priceMax, clipped } = useMemo(() => robustPriceMax(data), [data]);
   const cities = ROYAL_CITIES.filter((c) => data.some((d) => d[`${c}:price`] !== undefined));
   if (data.length === 0) {
-    return <EmptyState title="Veri bulunamadı">Bu kalite için son 30 günde kaydedilmiş satış geçmişi yok.</EmptyState>;
+    return <EmptyState title="Veri bulunamadı">Bu Quality için son 30 günde kaydedilmiş satış geçmişi yok.</EmptyState>;
   }
   const axis = { stroke: "var(--muted-foreground)", fontSize: 11, tickLine: false };
   return (
@@ -267,16 +267,16 @@ function OrderbookPanel({ detail, quality }: { detail: ItemDetailResponse; quali
       </div>
       <div className="grid sm:grid-cols-2 sm:divide-x sm:divide-border">
         <div>
-          <p className="px-3 pt-2 text-xs font-medium">Satış emirleri (anında alım)</p>
+          <p className="px-3 pt-2 text-xs font-medium">Sell Orders (Instant Buy)</p>
           {side(entry?.sell ?? [], "text-loss", quote?.sellMinAt ?? null)}
         </div>
         <div>
-          <p className="px-3 pt-2 text-xs font-medium">Alış emirleri (anında satış)</p>
+          <p className="px-3 pt-2 text-xs font-medium">Buy Orders (Instant Sell)</p>
           {side(entry?.buy ?? [], "text-profit", quote?.buyMaxAt ?? null)}
         </div>
       </div>
       <p className="px-3 py-2 text-[11px] text-muted-foreground">
-        Fiyat seviyesi başına toplanmış; yalnızca oyuncu istemcilerinin gördüğü emirler. Üstü çizili seviyeler, daha yeni bir fiyat gözleminden
+        Fiyat seviyesi başına toplanmış; yalnızca oyuncu istemcilerinin gördüğü Order&apos;lar. Üstü çizili seviyeler, daha yeni bir fiyat gözleminden
         önce görülmüştür ve muhtemelen artık yoktur; derinlik hesabına katılmaz.
       </p>
     </div>
@@ -301,8 +301,8 @@ function RiskNotes({ quotes, stats, maxAge, inUniverse }: { quotes: Quote[]; sta
     const v = stats.get(c)?.avgDailyVolume;
     return v != null && v < 5;
   });
-  if (thin.length) notes.push(`Düşük hacim (<5/gün): ${thin.join(", ")} — emirler uzun süre bekleyebilir.`);
-  if (!inUniverse) notes.push("Bu ürün otomatik tarama evreninde değil; fırsat tablolarında görünmez.");
+  if (thin.length) notes.push(`Düşük hacim (<5/gün): ${thin.join(", ")} — Order'lar uzun süre bekleyebilir.`);
+  if (!inUniverse) notes.push("Bu item otomatik tarama evreninde değil; fırsat tablolarında görünmez.");
   if (notes.length === 0) notes.push("Belirgin veri riski tespit edilmedi. Yine de fiyatlar oyuncu istemcilerinden toplanır ve değişebilir.");
   return (
     <ul className="list-disc space-y-1 py-3 pr-3 pl-7 text-xs text-muted-foreground">
@@ -383,7 +383,7 @@ export function ItemDetailView() {
       <div className="space-y-3 px-3 lg:px-4">
         {qualities.length > 1 && (
           <div className="flex flex-wrap items-center gap-1">
-            <span className="mr-1 text-[11px] tracking-wide text-muted-foreground uppercase">Kalite</span>
+            <span lang="en" className="mr-1 text-[11px] tracking-wide text-muted-foreground uppercase">Quality</span>
             {qualities.map((q) => (
               <button
                 key={q}
@@ -425,7 +425,7 @@ export function ItemDetailView() {
         </Panel>
 
         <div className="grid gap-3 xl:grid-cols-[1fr_22rem]">
-          <Panel title="Emir defteri">
+          <Panel title="Order Book">
             <OrderbookPanel detail={detail} quality={quality} />
           </Panel>
           <Panel title="Riskler">
@@ -433,14 +433,14 @@ export function ItemDetailView() {
           </Panel>
         </div>
 
-        <Panel title="Bu ürün için fırsatlar (tüm kaliteler, tüm şehirler)">
+        <Panel title="Bu item için fırsatlar (tüm Quality seçenekleri, tüm şehirler)">
           {oppQuery.isError && !opps ? (
             <ErrorState error={oppQuery.error} onRetry={() => oppQuery.refetch()} />
           ) : !opps ? (
             <TableSkeleton rows={4} />
           ) : opps.flips.items.length + opps.trades.items.length === 0 ? (
             <EmptyState title="Güncel kârlı fırsat bulunamadı">
-              {detail.inScanUniverse ? "Ayarlardaki ROI ve veri yaşı eşiklerini geçen bir fırsat yok." : "Bu ürün tarama evreninde değil."}
+              {detail.inScanUniverse ? "Ayarlardaki ROI ve veri yaşı eşiklerini geçen bir fırsat yok." : "Bu item tarama evreninde değil."}
             </EmptyState>
           ) : (
             <div className="divide-y divide-border">

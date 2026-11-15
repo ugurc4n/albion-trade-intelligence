@@ -71,10 +71,10 @@ export function ConfidenceBadge({ confidence }: { confidence: Confidence }) {
 
 export const FLAG_INFO: Record<OpportunityFlag, { label: string; tip: string }> = {
   no_volume: { label: "Hacim yok", tip: "Son 7 günde gözlemlenmiş satış verisi yok. Likidite bilinmiyor; önerilen adet en fazla 10." },
-  low_volume: { label: "Düşük hacim", tip: "Günde 5'ten az satış gözlemlendi. Emirler uzun süre dolmayabilir." },
+  low_volume: { label: "Düşük hacim", tip: "Günde 5'ten az satış gözlemlendi. Order'lar uzun süre dolmayabilir." },
   volatile: { label: "Oynak", tip: "Günlük ortalama fiyatların değişim katsayısı %20'nin üzerinde." },
-  price_outlier: { label: "Anomali", tip: "Kullanılan fiyat 7 günlük ortalamadan çok sapıyor (troll/eski emir olabilir)." },
-  extreme_roi: { label: "Aşırı ROI", tip: "ROI %150'nin üzerinde. Genellikle eski veya hatalı emirlerden kaynaklanır." },
+  price_outlier: { label: "Anomali", tip: "Kullanılan fiyat 7 günlük ortalamadan çok sapıyor (troll/eski Order olabilir)." },
+  extreme_roi: { label: "Aşırı ROI", tip: "ROI %150'nin üzerinde. Genellikle eski veya hatalı Order'lardan kaynaklanır." },
   stale: { label: "Eski veri", tip: "Kullanılan fiyatlardan biri veri yaşı sınırını aşıyor. Güncel fırsat değildir." },
   budget_exceeds: { label: "Bütçe üstü", tip: "Tek birimin maliyeti ticaret bütçesini aşıyor." },
 };
@@ -100,17 +100,10 @@ export function FlagBadges({ flags }: { flags: OpportunityFlag[] }) {
   );
 }
 
-const SCENARIO_SHORT: Record<ScenarioId, string> = {
-  "instant-order": "Anında → Emir",
-  "order-order": "Emir → Emir",
-  "order-instant": "Emir → Anında",
-  "instant-instant": "Anında → Anında",
-};
-
 export function ScenarioBadge({ scenario }: { scenario: ScenarioId }) {
   return (
     <WithTip tip={SCENARIO_LABELS[scenario]}>
-      <Pill className="border-transparent bg-sky-400/12 text-sky-300">{SCENARIO_SHORT[scenario]}</Pill>
+      <Pill className="border-transparent bg-sky-400/12 text-sky-300">{SCENARIO_LABELS[scenario]}</Pill>
     </WithTip>
   );
 }

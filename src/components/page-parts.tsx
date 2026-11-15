@@ -105,7 +105,7 @@ export function DataStatus({
         </span>
       </span>
       <span>
-        <span className="num text-foreground">{formatSilver(meta.universeSize)}</span> ürün ·{" "}
+        <span className="num text-foreground">{formatSilver(meta.universeSize)}</span> item ·{" "}
         <span className="num text-foreground">{formatSilver(meta.quoteCount)}</span> fiyat noktası
       </span>
       {meta.errors.length > 0 && (
@@ -147,8 +147,8 @@ export function KpiStrip({ items }: { items: { label: string; value: ReactNode; 
 export function Disclaimer({ className }: { className?: string }) {
   return (
     <p className={cn("text-[11px] leading-relaxed text-muted-foreground/80", className)}>
-      Gösterilen kârlar tahminidir: fiyatlar oyuncu istemcilerinden toplanır, gecikmeli veya eksik olabilir; emirlerin dolacağı garanti
-      edilmez. Vergi ve kurulum ücretleri ayarlardaki varsayımlarla hesaplanır.
+      Gösterilen kârlar tahminidir: fiyatlar oyuncu istemcilerinden toplanır, gecikmeli veya eksik olabilir; Order&apos;ların dolacağı garanti
+      edilmez. Sales Tax ve Setup Fee ayarlardaki varsayımlarla hesaplanır.
     </p>
   );
 }

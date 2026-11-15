@@ -6,17 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useSettings } from "@/hooks/use-settings";
-import { ROYAL_CITIES, SERVERS, SERVER_IDS, type ServerId } from "@/lib/albion/constants";
+import { QUALITY_LABELS, ROYAL_CITIES, SERVERS, SERVER_IDS, type ServerId } from "@/lib/albion/constants";
 import { CATEGORY_LABELS } from "@/lib/catalog/types";
-import type { ScenarioId } from "@/lib/profit/engine";
+import { SCENARIO_LABELS, type ScenarioId } from "@/lib/profit/engine";
 import type { Filters } from "@/lib/settings/schema";
 import type { RiskLevel } from "@/lib/scanner/types";
 import { cn } from "@/lib/utils";
 
 type Variant = "flip" | "trade" | "basket";
 
-export function FieldLabel({ children }: { children: ReactNode }) {
-  return <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{children}</span>;
+export function FieldLabel({ children, lang }: { children: ReactNode; lang?: string }) {
+  return <span lang={lang} className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{children}</span>;
 }
 
 export function NativeSelect({
@@ -132,23 +132,12 @@ function NumberField({
 
 const TIERS = [4, 5, 6, 7, 8].map((t) => ({ value: t, label: `T${t}` }));
 const ENCHANTS = [0, 1, 2, 3, 4].map((e) => ({ value: e, label: `.${e}` }));
-const QUALITIES = [
-  { value: 1, label: "Normal" },
-  { value: 2, label: "İyi" },
-  { value: 3, label: "Seçkin" },
-  { value: 4, label: "Mükemmel" },
-  { value: 5, label: "Başyapıt" },
-];
+const QUALITIES = [1, 2, 3, 4, 5].map((value) => ({ value, label: QUALITY_LABELS[value] }));
 const CATEGORIES = ["crafting", "weapons", "armors", "head", "shoes", "offhands", "capes", "bags", "consumables", "mounts"].map((c) => ({
   value: c,
   label: CATEGORY_LABELS[c] ?? c,
 }));
-const SCENARIOS: { value: ScenarioId; label: string }[] = [
-  { value: "instant-order", label: "Anında → Emir" },
-  { value: "order-order", label: "Emir → Emir" },
-  { value: "order-instant", label: "Emir → Anında" },
-  { value: "instant-instant", label: "Anında → Anında" },
-];
+const SCENARIOS = (Object.keys(SCENARIO_LABELS) as ScenarioId[]).map((value) => ({ value, label: SCENARIO_LABELS[value] }));
 const RISKS: { value: RiskLevel; label: string }[] = [
   { value: "low", label: "Düşük" },
   { value: "medium", label: "Orta" },
@@ -189,12 +178,12 @@ export function FiltersBar({
     <div className="border-b border-border bg-surface">
       <div className="flex flex-wrap items-end gap-x-3 gap-y-2 px-3 py-2.5">
         <label className="relative min-w-48 flex-1 sm:max-w-72">
-          <span className="sr-only">Ürün ara</span>
+          <span className="sr-only">Item ara</span>
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Ürün ara (isim / ID)"
+            placeholder="Item ara (isim / ID)"
             className="h-8 pl-8 text-[13px]"
           />
         </label>
@@ -264,16 +253,16 @@ export function FiltersBar({
       {open && (
         <div className="grid gap-3 border-t border-border/70 px-3 py-3 lg:grid-cols-[auto_auto_1fr]">
           <div className="flex flex-col gap-1">
-            <FieldLabel>Tier</FieldLabel>
+            <FieldLabel lang="en">Tier</FieldLabel>
             <Chips label="Tier" options={TIERS} value={filters.tiers} onChange={(tiers) => onChange({ tiers })} />
           </div>
           <div className="flex flex-col gap-1">
-            <FieldLabel>Enchant</FieldLabel>
-            <Chips label="Enchant" options={ENCHANTS} value={filters.enchants} onChange={(enchants) => onChange({ enchants })} />
+            <FieldLabel lang="en">Enchantment</FieldLabel>
+            <Chips label="Enchantment" options={ENCHANTS} value={filters.enchants} onChange={(enchants) => onChange({ enchants })} />
           </div>
           <div className="flex flex-col gap-1">
-            <FieldLabel>Kalite</FieldLabel>
-            <Chips label="Kalite" options={QUALITIES} value={filters.qualities} onChange={(qualities) => onChange({ qualities })} />
+            <FieldLabel lang="en">Quality</FieldLabel>
+            <Chips label="Quality" options={QUALITIES} value={filters.qualities} onChange={(qualities) => onChange({ qualities })} />
           </div>
           <div className="flex flex-col gap-1 lg:col-span-3">
             <FieldLabel>Kategori</FieldLabel>

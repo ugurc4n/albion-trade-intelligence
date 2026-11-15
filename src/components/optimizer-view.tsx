@@ -37,7 +37,7 @@ export function OptimizerView() {
             },
             {
               label: "Tahmini kâr",
-              tip: "Tüm emirlerin önerilen fiyatlardan dolması halinde. Garanti değildir; günlük kazanç tahmini değildir.",
+              tip: "Tüm Order'ların önerilen fiyatlardan dolması halinde. Garanti değildir; günlük kazanç tahmini değildir.",
               value: <ProfitValue value={basket?.estimatedProfit ?? null} compact />,
               sub: basket && basket.totalInvestment > 0 ? `${formatPercent(basket.estimatedProfit / basket.totalInvestment)} sepet ROI` : undefined,
             },
@@ -58,7 +58,7 @@ export function OptimizerView() {
             <TableSkeleton rows={6} note="Piyasa taranıyor…" />
           ) : basket.lines.length === 0 ? (
             <EmptyState title="Sepete alınabilecek güvenilir fırsat yok">
-              Eski veri, anomali veya aşırı ROI işaretli fırsatlar ve bütçeyi aşan ürünler sepete alınmaz.
+              Eski veri, anomali veya aşırı ROI işaretli fırsatlar ve bütçeyi aşan item&apos;lar sepete alınmaz.
             </EmptyState>
           ) : (
             <BasketTable basket={basket} />
@@ -67,18 +67,18 @@ export function OptimizerView() {
 
         <Panel title="Algoritma kuralları">
           <ul className="list-disc space-y-1 py-3 pr-3 pl-7 text-xs text-muted-foreground">
-            <li>Her ürün için tek pozisyon (en yüksek skorlu kalite/rota); en fazla 12 pozisyon.</li>
+            <li>Her item için tek pozisyon (en yüksek skorlu Quality/rota); en fazla 12 pozisyon.</li>
             <li>
               Pozisyon başına bütçe tavanı: düşük risk {formatPercent(params.maxBudgetShare.low)}, orta {formatPercent(params.maxBudgetShare.medium)}, yüksek{" "}
               {formatPercent(params.maxBudgetShare.high)}, hacim verisi yok {formatPercent(params.unknownVolumeShare)}.
             </li>
             <li>
-              Adet, gözlemlenen günlük hacmin {formatPercent(params.volumeShare)}&apos;i × {params.maxHoldDays} gün ile sınırlanır (emir tarafları arasında
-              bölünür). Anında işlemlerde emir defteri derinliği (fiyatın %3 yakınındaki miktar) kontrol edilir
-              {query.data && !query.data.orderbookChecked && " — bu taramada anında işlem adayı olmadığı için kullanılmadı"}.
+              Adet, gözlemlenen günlük hacmin {formatPercent(params.volumeShare)}&apos;i × {params.maxHoldDays} gün ile sınırlanır (Order tarafları arasında
+              bölünür). Instant Buy/Instant Sell işlemlerinde Order Book derinliği (fiyatın %3 yakınındaki miktar) kontrol edilir
+              {query.data && !query.data.orderbookChecked && " — bu taramada Instant Buy/Instant Sell adayı olmadığı için kullanılmadı"}.
             </li>
             <li>Eski veri, fiyat anomalisi ve %150 üzeri ROI işaretli fırsatlar sepete alınmaz.</li>
-            <li>Sepet, ürünlerin gerçekten alınabileceğini veya satılabileceğini garanti etmez.</li>
+            <li>Sepet, item&apos;ların gerçekten alınabileceğini veya satılabileceğini garanti etmez.</li>
           </ul>
         </Panel>
         <Disclaimer />

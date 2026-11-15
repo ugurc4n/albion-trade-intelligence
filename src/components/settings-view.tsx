@@ -137,7 +137,7 @@ function SettingsForm({ initial, onSave, onReset }: { initial: Settings; onSave:
               ))}
             </NativeSelect>
           </Row>
-          <Row label="Premium" hint="Satış vergisi oranını belirler.">
+          <Row label="Premium" hint="Sales Tax oranını belirler.">
             <Switch checked={draft.premium} onCheckedChange={(v) => set({ premium: v })} />
             <span className="text-xs text-muted-foreground">{draft.premium ? "Premium aktif" : "Premium yok"}</span>
           </Row>
@@ -181,15 +181,15 @@ function SettingsForm({ initial, onSave, onReset }: { initial: Settings; onSave:
           </Row>
         </Panel>
 
-        <Panel title="Vergi ve ücret varsayımları">
+        <Panel title="Sales Tax ve Setup Fee varsayımları">
           <p className="border-b border-border/60 px-3 py-2 text-[11px] leading-relaxed text-warn">{FEE_ASSUMPTION_NOTE}</p>
-          <Row label="Emir kurulum ücreti" hint={`Varsayılan %${DEFAULT_FEES.setupFeeRate * 100}`}>
+          <Row label="Setup Fee" hint={`Varsayılan %${DEFAULT_FEES.setupFeeRate * 100}`}>
             <NumInput value={draft.fees.setupFeeRate} scale={100} suffix="%" width="w-28" onChange={(v) => setFees({ setupFeeRate: v ?? 0 })} />
           </Row>
-          <Row label="Satış vergisi (Premium)" hint={`Varsayılan %${DEFAULT_FEES.salesTaxRatePremium * 100}`}>
+          <Row label="Sales Tax (Premium)" hint={`Varsayılan %${DEFAULT_FEES.salesTaxRatePremium * 100}`}>
             <NumInput value={draft.fees.salesTaxRatePremium} scale={100} suffix="%" width="w-28" onChange={(v) => setFees({ salesTaxRatePremium: v ?? 0 })} />
           </Row>
-          <Row label="Satış vergisi (Premium yok)" hint={`Varsayılan %${DEFAULT_FEES.salesTaxRateNonPremium * 100}`}>
+          <Row label="Sales Tax (Premium yok)" hint={`Varsayılan %${DEFAULT_FEES.salesTaxRateNonPremium * 100}`}>
             <NumInput
               value={draft.fees.salesTaxRateNonPremium}
               scale={100}
@@ -198,7 +198,7 @@ function SettingsForm({ initial, onSave, onReset }: { initial: Settings; onSave:
               onChange={(v) => setFees({ salesTaxRateNonPremium: v ?? 0 })}
             />
           </Row>
-          <Row label="Beklenen yeniden listeleme" hint="Satış emri başına; her biri kurulum ücretini yeniden öder.">
+          <Row label="Beklenen yeniden listeleme" hint="Sell Order başına; her biri Setup Fee'yi yeniden öder.">
             <NumInput value={draft.fees.expectedRelists} width="w-28" onChange={(v) => setFees({ expectedRelists: v ?? 0 })} />
           </Row>
         </Panel>

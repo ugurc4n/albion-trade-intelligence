@@ -22,7 +22,7 @@ export const DEFAULT_FEES: FeeConfig = {
 };
 
 export const FEE_ASSUMPTION_NOTE =
-  "Varsayım: Emir kurulum ücreti %2.5 (alış ve satış emri, iade edilmez), satış vergisi Premium %4 / Premium yok %8. Anında alımda ücret yok, anında satışta yalnız satış vergisi. Resmi kaynaktan doğrulanamadı — oyun içi market ekranından kontrol edin.";
+  "Varsayım: Setup Fee %2.5 (Buy Order ve Sell Order, iade edilmez), Sales Tax Premium %4 / Premium yok %8. Instant Buy'da ücret yok, Instant Sell'de yalnız Sales Tax. Resmi kaynaktan doğrulanamadı — oyun içi market ekranından kontrol edin.";
 
 export function salesTaxRate(fees: FeeConfig, premium: boolean): number {
   return premium ? fees.salesTaxRatePremium : fees.salesTaxRateNonPremium;

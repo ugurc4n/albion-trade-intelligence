@@ -29,21 +29,21 @@ export type AvalonDataFile = {
 };
 
 export const CHEST_SIZE_LABELS: Record<ChestSize, string> = {
-  small: "Küçük",
-  medium: "Orta",
-  large: "Büyük",
+  small: "Small",
+  medium: "Medium",
+  large: "Large",
 };
 
 export const CHEST_GRADE_LABELS: Record<ChestGrade, string> = {
-  standard: "Standart",
+  standard: "Standard",
   veteran: "Veteran",
-  elite: "Elit",
+  elite: "Elite",
 };
 
 export const DUNGEON_KIND_LABELS: Record<DungeonKind, string> = {
-  solo: "Solo zindan",
-  group: "Grup zindanı",
-  avalonian: "Avalon zindanı (elit)",
+  solo: "Solo Dungeon",
+  group: "Group Dungeon",
+  avalonian: "Avalonian Dungeon (Elite)",
 };
 
 export const FACTION_LABELS: Record<string, string> = {
@@ -51,31 +51,31 @@ export const FACTION_LABELS: Record<string, string> = {
   HER: "Heretic",
   MOR: "Morgana",
   UND: "Undead",
-  AVA: "Avalon",
+  AVA: "Avalonian",
 };
 
 export const RESOURCE_LABELS: Record<string, string> = {
-  WOOD: "Odun",
-  ORE: "Maden",
-  FIBER: "Lif",
-  HIDE: "Deri",
-  ROCK: "Taş",
+  WOOD: "Wood",
+  ORE: "Ore",
+  FIBER: "Fiber",
+  HIDE: "Hide",
+  ROCK: "Stone",
 };
 
 /** Literal readings of the raw cluster type codes — no claims beyond what the code itself says. */
 export const ZONE_TYPE_LABELS: Record<string, string> = {
   TUNNEL_ROYAL: "Royal",
-  TUNNEL_ROYAL_RED: "Royal (kırmızı)",
-  TUNNEL_LOW: "Düşük",
-  TUNNEL_MEDIUM: "Orta",
-  TUNNEL_HIGH: "Yüksek",
-  TUNNEL_DEEP: "Derin",
-  TUNNEL_DEEP_RAID: "Derin (raid)",
-  TUNNEL_BLACK_LOW: "Black · düşük",
-  TUNNEL_BLACK_MEDIUM: "Black · orta",
-  TUNNEL_BLACK_HIGH: "Black · yüksek",
+  TUNNEL_ROYAL_RED: "Royal (Red)",
+  TUNNEL_LOW: "Low",
+  TUNNEL_MEDIUM: "Medium",
+  TUNNEL_HIGH: "High",
+  TUNNEL_DEEP: "Deep",
+  TUNNEL_DEEP_RAID: "Deep (Raid)",
+  TUNNEL_BLACK_LOW: "Black · Low",
+  TUNNEL_BLACK_MEDIUM: "Black · Medium",
+  TUNNEL_BLACK_HIGH: "Black · High",
   TUNNEL_HIDEOUT: "Hideout",
-  TUNNEL_HIDEOUT_DEEP: "Hideout (derin)",
+  TUNNEL_HIDEOUT_DEEP: "Hideout (Deep)",
 };
 
 export function zoneTypeLabel(type: string): string {

@@ -8,10 +8,10 @@ export const SECTIONS: Record<SectionKey, { href: string; label: string; icon: L
   flipping: { href: "/flipping", label: "Market Flipping", icon: Repeat, tone: "cyan" },
   trade: { href: "/trade", label: "Şehirler Arası", icon: Route, tone: "sky" },
   optimizer: { href: "/optimizer", label: "Bütçe Optimizer", icon: Wallet, tone: "amber" },
-  avalon: { href: "/avalon", label: "Avalon Yolları", icon: Compass, tone: "emerald" },
+  avalon: { href: "/avalon", label: "Roads of Avalon", icon: Compass, tone: "emerald" },
   damage: { href: "/damage", label: "Damage Meter", icon: Swords, tone: "fuchsia" },
   settings: { href: "/settings", label: "Ayarlar", icon: Settings2, tone: "slate" },
-  item: { href: "/item", label: "Ürün", icon: Repeat, tone: "cyan" },
+  item: { href: "/item", label: "Item", icon: Repeat, tone: "cyan" },
 };
 
 export const NAV_SECTIONS: SectionKey[] = ["dashboard", "flipping", "trade", "optimizer", "avalon", "damage", "settings"];

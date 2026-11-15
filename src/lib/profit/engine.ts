@@ -16,10 +16,10 @@ export const scenarioId = (s: Scenario) => `${s.buy}-${s.sell}` as const;
 export type ScenarioId = ReturnType<typeof scenarioId>;
 
 export const SCENARIO_LABELS: Record<ScenarioId, string> = {
-  "instant-order": "Anında Al → Satış Emri",
-  "order-order": "Alış Emri → Satış Emri",
-  "order-instant": "Alış Emri → Anında Sat",
-  "instant-instant": "Anında Al → Anında Sat",
+  "instant-order": "Instant Buy → Sell Order",
+  "order-order": "Buy Order → Sell Order",
+  "order-instant": "Buy Order → Instant Sell",
+  "instant-instant": "Instant Buy → Instant Sell",
 };
 
 export type ProfitInput = {

@@ -11,20 +11,20 @@ export type CatalogItem = {
 };
 
 export const CATEGORY_LABELS: Record<string, string> = {
-  crafting: "Kaynaklar",
-  weapons: "Silahlar",
-  armors: "Zırhlar",
-  head: "Başlıklar",
-  shoes: "Ayakkabılar",
-  offhands: "Yan Eller",
-  capes: "Pelerinler",
-  bags: "Çantalar",
-  consumables: "Tüketilebilir",
-  mounts: "Binekler",
-  artefacts: "Artefaktlar",
-  gathering: "Toplama Ekipmanı",
-  farming: "Çiftçilik",
-  furniture: "Mobilya",
+  crafting: "Resources",
+  weapons: "Weapons",
+  armors: "Armor",
+  head: "Head",
+  shoes: "Shoes",
+  offhands: "Off-Hands",
+  capes: "Capes",
+  bags: "Bags",
+  consumables: "Consumables",
+  mounts: "Mounts",
+  artefacts: "Artifacts",
+  gathering: "Gathering Gear",
+  farming: "Farming",
+  furniture: "Furniture",
 };
 
 /**

@@ -62,12 +62,12 @@ export function ItemSearch() {
           else if (e.key === "Enter" && data[active]) go(data[active].id);
           else if (e.key === "Escape") setOpen(false);
         }}
-        placeholder="Ürün detayına git…"
+        placeholder="Item detayına git…"
         className="h-8 pl-8 text-[13px]"
         role="combobox"
         aria-expanded={open && data.length > 0}
         aria-controls="item-search-list"
-        aria-label="Ürün ara"
+        aria-label="Item ara"
       />
       {open && query.length >= 2 && (
         <ul

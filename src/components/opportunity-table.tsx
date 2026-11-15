@@ -70,7 +70,7 @@ function ItemCell({ o }: { o: Opportunity }) {
 function buildColumns(variant: Variant, maxAge: number) {
   const item = helper.accessor((o) => o.name, {
     id: "item",
-    header: "Ürün",
+    header: "Item",
     cell: (info) => <ItemCell o={info.row.original} />,
   });
   const route =
@@ -97,12 +97,12 @@ function buildColumns(variant: Variant, maxAge: number) {
       ? [
           helper.accessor((o) => o.sourceBuyMax, {
             id: "buyMax",
-            header: "En yüksek alış emri",
+            header: "En yüksek Buy Order",
             cell: (i) => <Silver value={i.getValue()} className="text-muted-foreground" />,
           }),
           helper.accessor((o) => o.sourceSellMin, {
             id: "sellMin",
-            header: "En düşük satış emri",
+            header: "En düşük Sell Order",
             cell: (i) => <Silver value={i.getValue()} className="text-muted-foreground" />,
           }),
           helper.accessor((o) => o.profit.buyPrice, { id: "buyPrice", header: "Önerilen alış", cell: (i) => <Silver value={i.getValue()} /> }),
@@ -115,7 +115,7 @@ function buildColumns(variant: Variant, maxAge: number) {
             cell: (i) => (
               <div className="leading-tight">
                 <Silver value={i.getValue()} />
-                <div className="text-[10px] text-muted-foreground">{i.row.original.buyMode === "instant" ? "anında al" : "alış emri"}</div>
+                <div className="text-[10px] text-muted-foreground">{i.row.original.buyMode === "instant" ? "Instant Buy" : "Buy Order"}</div>
               </div>
             ),
           }),
@@ -125,7 +125,7 @@ function buildColumns(variant: Variant, maxAge: number) {
             cell: (i) => (
               <div className="leading-tight">
                 <Silver value={i.getValue()} />
-                <div className="text-[10px] text-muted-foreground">{i.row.original.sellMode === "instant" ? "anında sat" : "satış emri"}</div>
+                <div className="text-[10px] text-muted-foreground">{i.row.original.sellMode === "instant" ? "Instant Sell" : "Sell Order"}</div>
               </div>
             ),
           }),
@@ -190,11 +190,11 @@ const DESKTOP_ONLY = new Set(["buyMax", "sellMin", "volume", "capital", "confide
 function Breakdown({ o }: { o: Opportunity }) {
   const p = o.profit;
   const rows: [string, number, string?][] = [
-    [o.buyMode === "instant" ? "Anında alış fiyatı" : "Alış emri fiyatı", p.buyPrice],
-    ["Alış emri kurulum ücreti", -p.buySetupFee, o.buyMode === "order" ? undefined : "anında alımda yok"],
-    [o.sellMode === "instant" ? "Anında satış fiyatı" : "Satış emri fiyatı", p.sellPrice],
-    ["Satış vergisi", -p.salesTax],
-    ["Satış emri kurulum ücreti", -p.sellSetupFee, o.sellMode === "order" ? undefined : "anında satışta yok"],
+    [o.buyMode === "instant" ? "Instant Buy fiyatı" : "Buy Order fiyatı", p.buyPrice],
+    ["Buy Order Setup Fee", -p.buySetupFee, o.buyMode === "order" ? undefined : "Instant Buy'da yok"],
+    [o.sellMode === "instant" ? "Instant Sell fiyatı" : "Sell Order fiyatı", p.sellPrice],
+    ["Sales Tax", -p.salesTax],
+    ["Sell Order Setup Fee", -p.sellSetupFee, o.sellMode === "order" ? undefined : "Instant Sell'de yok"],
     ["Yeniden listeleme (varsayım)", -p.relistCost],
     ["Taşıma (varsayım)", -p.transport],
   ];
@@ -250,10 +250,10 @@ function Breakdown({ o }: { o: Opportunity }) {
           <FlagBadges flags={o.flags} />
         </p>
         <p className="text-[11px] text-muted-foreground/80">
-          Tahmini değerlerdir: emirlerin dolması, fiyatların sabit kalması ve gösterilen derinliğin mevcut olması garanti değildir. Veri {formatAge(o.dataAgeMinutes)} önce görüldü.
+          Tahmini değerlerdir: Order&apos;ların dolması, fiyatların sabit kalması ve gösterilen derinliğin mevcut olması garanti değildir. Veri {formatAge(o.dataAgeMinutes)} önce görüldü.
         </p>
         <Link href={`/item/${encodeURIComponent(o.itemId)}`} className="inline-flex items-center gap-1 text-primary hover:underline">
-          Ürün detayı <ExternalLink className="size-3" />
+          Item detayı <ExternalLink className="size-3" />
         </Link>
       </div>
     </div>

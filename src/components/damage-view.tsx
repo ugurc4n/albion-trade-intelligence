@@ -133,7 +133,7 @@ function PlayerTable({
 
   if (players.length === 0) {
     return (
-      <EmptyState title="Henüz hasar yok">
+      <EmptyState title="Henüz damage yok">
         Oturum açık; vuruşlar geldikçe burada görünür. Bir oyuncunun adı çıkmıyorsa, o oyuncu bölgeye girdiğinde yakalayıcının
         çalışıyor olması gerekir (isimler bölgeye girişte gelir).
       </EmptyState>
@@ -146,12 +146,12 @@ function PlayerTable({
         <thead>
           <tr className="border-b border-border text-left text-[11px] tracking-wide text-muted-foreground uppercase">
             <th className="px-3 py-2 font-medium">Oyuncu</th>
-            <th className="px-3 py-2 text-right font-medium">Hasar</th>
+            <th lang="en" className="px-3 py-2 text-right font-medium">Damage</th>
             <th className="w-[28%] px-3 py-2 font-medium">Pay</th>
-            <th className="px-3 py-2 text-right font-medium">DPS</th>
-            <th className="px-3 py-2 text-right font-medium">İyileştirme</th>
-            <th className="px-3 py-2 text-right font-medium">Alınan</th>
-            <th className="px-3 py-2 text-right font-medium">Vuruş</th>
+            <th lang="en" className="px-3 py-2 text-right font-medium">DPS</th>
+            <th lang="en" className="px-3 py-2 text-right font-medium">Healing</th>
+            <th lang="en" className="px-3 py-2 text-right font-medium">Damage Taken</th>
+            <th lang="en" className="px-3 py-2 text-right font-medium">Hits</th>
           </tr>
         </thead>
         <tbody>
@@ -188,13 +188,13 @@ function PlayerTable({
           Süre <span className="num text-foreground">{formatDuration(end - session.startedAt)}</span>
         </span>
         <span>
-          Toplam hasar <span className="num text-foreground">{formatSilver(total)}</span>
+          Toplam Damage <span className="num text-foreground">{formatSilver(total)}</span>
         </span>
         <span>
-          Grup DPS <span className="num text-foreground">{formatSilver(total / seconds)}</span>
+          Party DPS <span className="num text-foreground">{formatSilver(total / seconds)}</span>
         </span>
         {session.unattributedDamage > 0 && (
-          <span title="Sahibi eşleşmeyen hasar: pet/çağrılan yaratıklar veya adı yakalanmadan önce bölgeye girmiş oyuncular.">
+          <span title="Sahibi eşleşmeyen damage: pet/summon veya adı yakalanmadan önce bölgeye girmiş oyuncular.">
             Eşleşmeyen <span className="num text-foreground">{formatSilver(session.unattributedDamage)}</span>
           </span>
         )}
@@ -339,10 +339,10 @@ function autoStatusText(s: DamageState): { tone: "ok" | "wait" | "off"; text: st
   if (s.config) {
     const when = new Date(s.config.calibratedAt).toLocaleString("tr-TR");
     const how = s.config.source === "auto" ? "otomatik" : "elle";
-    return { tone: "ok", text: `Hasar olayı tanındı (${how}, ${when}). Yamadan sonra bozulursa kendiliğinden yenilenir.` };
+    return { tone: "ok", text: `Damage olayı tanındı (${how}, ${when}). Yamadan sonra bozulursa kendiliğinden yenilenir.` };
   }
   if (s.auto.state === "waiting") return { tone: "wait", text: s.auto.note };
-  return { tone: "wait", text: "Bir mob'a vurduğunda hasar olayı otomatik bulunacak." };
+  return { tone: "wait", text: "Bir mob'a vurduğunda damage olayı otomatik bulunacak." };
 }
 
 function ManualCalibration({ recording, connected }: { recording: DamageState["recording"]; connected: boolean }) {
@@ -382,7 +382,7 @@ function ManualCalibration({ recording, connected }: { recording: DamageState["r
   return (
     <div className="space-y-2.5 text-xs">
       <p className="text-muted-foreground">
-        Otomatik bulma bir şeyi yanlış tanırsa kullan: kayıt al, bir mob&apos;a vur, adayları oyunda gördüğün hasar sayılarıyla karşılaştır.
+        Otomatik bulma bir şeyi yanlış tanırsa kullan: kayıt al, bir mob&apos;a vur, adayları oyunda gördüğün damage değerleriyle karşılaştır.
       </p>
       <label className="block space-y-1">
         <FieldLabel>Karakter adları (isteğe bağlı)</FieldLabel>
@@ -406,12 +406,12 @@ function ManualCalibration({ recording, connected }: { recording: DamageState["r
       {result &&
         (result.health.length === 0 ? (
           <p className="text-warn">
-            Kayıtta hasar olayı bulunamadı ({result.packets} paket). Kayıt sırasında bölge değiştirip bir mob&apos;a vurduğundan emin ol.
+            Kayıtta damage olayı bulunamadı ({result.packets} paket). Kayıt sırasında bölge değiştirip bir mob&apos;a vurduğundan emin ol.
             {result.namesMissing.length > 0 && ` Kayıtta geçmeyen isimler: ${result.namesMissing.join(", ")}.`}
           </p>
         ) : (
           <div className="space-y-2">
-            <div className="space-y-1.5" role="radiogroup" aria-label="Hasar olayı adayları">
+            <div className="space-y-1.5" role="radiogroup" aria-label="Damage olayı adayları">
               {result.health.map((h, idx) => (
                 <label
                   key={`${h.rule.signature}-${h.rule.causerKey}-${h.rule.changeKey}`}
@@ -440,7 +440,7 @@ function ManualCalibration({ recording, connected }: { recording: DamageState["r
                       </span>
                     </span>
                     <span className="block text-muted-foreground">
-                      Örnek hasarlar: <span className="num text-foreground">{h.sampleDamage.join(", ")}</span>
+                      Örnek damage değerleri: <span className="num text-foreground">{h.sampleDamage.join(", ")}</span>
                     </span>
                     <span className="block text-muted-foreground">{h.byName.map((b) => `${b.name} ${formatCompact(b.damage)}`).join(" · ")}</span>
                   </span>
@@ -522,7 +522,7 @@ function AutomationPanel({ s }: { s: DamageState }) {
           <label className="flex items-center justify-between gap-3 rounded-md border border-border px-2.5 py-2">
             <span>
               <span className="block font-medium">Otomatik kalibrasyon</span>
-              <span className="text-muted-foreground">Hasar olayını canlı trafikten bulur.</span>
+              <span className="text-muted-foreground">Damage olayını canlı trafikten bulur.</span>
             </span>
             <Switch checked={s.settings.autoCalibrate} onCheckedChange={(v) => set({ autoCalibrate: v })} />
           </label>
@@ -620,7 +620,7 @@ export function DamageView() {
     <div className="pb-8">
       <PageHeader section="damage"
         title="Damage Meter"
-        description="Grubunun hasar, iyileştirme ve alınan hasar dökümü. Yakalayıcıyı aç, static'i dön; oturum ilk vuruşta başlar ve bitince kendiliğinden kaydedilir."
+        description="Party için Damage, Healing ve Damage Taken dökümü. Yakalayıcıyı aç, static'i dön; oturum ilk vuruşta başlar ve bitince kendiliğinden kaydedilir."
       />
       <div className="space-y-3 px-3 lg:px-4">
         <div className="flex gap-2.5 rounded-lg border border-border bg-card p-3 text-xs leading-relaxed">
@@ -677,7 +677,7 @@ export function DamageView() {
                       {s!.settings.autoSession
                         ? s!.config
                           ? "Bekleniyor: ilk vuruşta oturum kendiliğinden başlar."
-                          : "Hasar olayı tanındığında (ilk savaşta) oturum kendiliğinden başlar."
+                          : "Damage olayı tanındığında (ilk savaşta) oturum kendiliğinden başlar."
                         : "Otomatik oturum kapalı; elle başlat."}
                     </p>
                     <label className="flex min-w-48 flex-col gap-1">
@@ -712,7 +712,7 @@ export function DamageView() {
                 <Input
                   value={names}
                   onChange={(e) => onNamesChange(e.target.value)}
-                  placeholder="Grup üyeleri (virgülle) — isteğe bağlı"
+                  placeholder="Party üyeleri (virgülle) — isteğe bağlı"
                   className="h-7 max-w-80 min-w-48 flex-1 text-xs"
                 />
               </div>
@@ -789,9 +789,9 @@ export function DamageView() {
             </Panel>
 
             <p className="text-[11px] leading-relaxed text-muted-foreground/80">
-              Sayılar, yakalayıcının çalıştığı oyuncunun istemcisine gelen olaylardır: görüş menzili dışındaki grup üyelerinin vuruşları
-              eksik olabilir. Pet/çağrılan yaratık hasarı &quot;eşleşmeyen&quot; olarak ayrı gösterilir. Kendine yapılan iyileştirme ve
-              oyuncudan oyuncuya hasar, verilen hasara sayılmaz. İyileştirme fazla iyileştirmeyi içerebilir. Çok kısa (10 vuruştan az)
+              Sayılar, yakalayıcının çalıştığı oyuncunun istemcisine gelen olaylardır: görüş menzili dışındaki party üyelerinin vuruşları
+              eksik olabilir. Pet/summon damage&apos;i &quot;eşleşmeyen&quot; olarak ayrı gösterilir. Self-healing ve
+              PvP damage, Damage toplamına sayılmaz. Healing, overhealing içerebilir. Çok kısa (10 vuruştan az)
               otomatik oturumlar kaydedilmez.
             </p>
           </>

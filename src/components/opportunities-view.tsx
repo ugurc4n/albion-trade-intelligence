@@ -13,12 +13,12 @@ const COPY = {
   flip: {
     title: "Market Flipping",
     description:
-      "Aynı şehirde alış emri (en yüksek alış emrinin 1 silver üstü) verip satış emri (en düşük satış emrinin 1 silver altı) ile satma fırsatları. Görünen fark kesin kazanç değildir; emirler dolmayabilir veya fiyatlar değişebilir.",
+      "Aynı şehirde Buy Order (en yüksek Buy Order'ın 1 silver üstü) verip Sell Order (en düşük Sell Order'ın 1 silver altı) ile satma fırsatları. Görünen fark kesin kazanç değildir; Order'lar dolmayabilir veya fiyatlar değişebilir.",
   },
   trade: {
     title: "Şehirler Arası Ticaret",
     description:
-      "Kraliyet şehirleri (Martlock, Lymhurst, Bridgewatch, Fort Sterling, Thetford) arasında güvenli rotalar. Caerleon ve Brecilien hariç. Anında alım/satım ile emir fiyatları ayrı senaryolar olarak hesaplanır.",
+      "Royal Cities (Martlock, Lymhurst, Bridgewatch, Fort Sterling, Thetford) arasında güvenli rotalar. Caerleon ve Brecilien hariç. Instant Buy/Instant Sell ile Buy Order/Sell Order fiyatları ayrı senaryolar olarak hesaplanır.",
   },
 } as const;
 

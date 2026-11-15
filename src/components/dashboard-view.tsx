@@ -36,7 +36,7 @@ export function DashboardView() {
     <div className="pb-4">
       <PageHeader section="dashboard"
         title="Panel"
-        description={`${settings.homeCity} çıkışlı fırsatlar · ${settings.premium ? "Premium" : "Premium yok"} vergileriyle · min. ROI %${Math.round(settings.minRoi * 100)} · maks. veri yaşı ${formatAge(settings.maxDataAgeMinutes)}`}
+        description={`${settings.homeCity} çıkışlı fırsatlar · ${settings.premium ? "Premium" : "Premium yok"} Sales Tax oranıyla · min. ROI %${Math.round(settings.minRoi * 100)} · maks. veri yaşı ${formatAge(settings.maxDataAgeMinutes)}`}
         actions={<DataStatus meta={data?.meta} isFetching={query.isFetching} onRefresh={() => query.refetch()} />}
       />
 
