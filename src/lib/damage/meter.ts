@@ -1,5 +1,6 @@
 import { expandRows, isIdTag, isObjectIdLike } from "./extract";
 import { EQUIPMENT_CHANGED_EVENT, readMainHand } from "./equipment";
+import { readFameReward } from "./fame";
 import { messageSignature, type PhotonMessage } from "./photon";
 import type { DamageConfig, MainHandObservation, PlayerStats, SessionRecord } from "./types";
 
@@ -8,7 +9,7 @@ const MAX_IDENTITIES = 5000;
 const MAX_SINGLE_CHANGE = 10_000_000;
 
 export type MeterOptions = {
-  /** Start a session on the first player hit and close it after `idleMs` without player activity. */
+  /** Start on a player hit or own Fame reward; close after `idleMs` without player activity. */
   autoSession: boolean;
   idleMs: number;
   /** Auto sessions with fewer player hits than this are discarded instead of saved (stray open-world hits). */
@@ -46,6 +47,9 @@ export class DamageMeter {
   private options: MeterOptions;
   /** Own character: learned from identity rules carried by operation responses (the join reply). */
   private self: string | null = null;
+  private selfId: number | null = null;
+  /** Lifetime counters prevent UDP duplicates and calibration replay from counting rewards twice. */
+  private fameCounters = new Map<string, number>();
 
   constructor(
     private config: DamageConfig | null = null,
@@ -93,6 +97,7 @@ export class DamageMeter {
       startedAt: now,
       endedAt: null,
       players: [],
+      fame: null,
       unattributedDamage: 0,
       configCalibratedAt: this.config?.calibratedAt ?? null,
       auto,
@@ -112,7 +117,7 @@ export class DamageMeter {
   }
 
   /**
-   * Closes an auto session once nobody has hit or healed for `idleMs` (stream time). Returns the session
+   * Closes an auto session without hits, healing or own Fame for `idleMs` (stream time). Returns the session
    * to save, or null — also null when it was too small to keep (it is discarded).
    */
   tick(now: number): { saved: SessionRecord | null; discarded: boolean } {
@@ -122,13 +127,15 @@ export class DamageMeter {
     }
     const done = this.stopSession(this.lastActivityAt)!;
     const hits = done.players.reduce((sum, p) => sum + p.hits, 0);
-    return hits >= this.options.minHits ? { saved: done, discarded: false } : { saved: null, discarded: true };
+    return hits >= this.options.minHits || (done.fame?.events ?? 0) > 0
+      ? { saved: done, discarded: false } : { saved: null, discarded: true };
   }
 
   snapshot(): SessionRecord | null {
     if (!this.session) return null;
     return {
       ...this.session,
+      fame: this.session.fame ? { ...this.session.fame } : null,
       players: [...this.players.values()].map((p) => ({
         ...p,
         mainHand: p.mainHand ? { ...p.mainHand, item: p.mainHand.item ? { ...p.mainHand.item } : null } : null,
@@ -138,6 +145,16 @@ export class DamageMeter {
 
   /** Learns player identities and equipment without counting damage — also used for traffic replay. */
   learnIdentities(msg: PhotonMessage) {
+    // The local join reply is also needed for Fame before damage calibration is available.
+    if (msg.kind === "response" && msg.code === 2) {
+      const id = msg.params.get(0);
+      const name = msg.params.get(2);
+      if (isObjectIdLike(id) && isIdTag(msg.types.get(0)) && typeof name === "string" && name.length > 0) {
+        this.learn(id, name);
+        this.self = name;
+        this.selfId = id;
+      }
+    }
     if (msg.kind === "event" && msg.code === EQUIPMENT_CHANGED_EVENT) {
       const id = msg.params.get(0);
       if (isObjectIdLike(id) && isIdTag(msg.types.get(0))) this.learnEquipment(id, readMainHand(msg, 2), msg.at);
@@ -152,13 +169,17 @@ export class DamageMeter {
       if (typeof name === "string" && name.length > 0 && isObjectIdLike(id) && isIdTag(msg.types.get(rule.idKey))) {
         this.learn(id, name);
         if (msg.kind === "event" && rule.nameKey === 1) this.learnEquipment(id, readMainHand(msg, 40), msg.at);
-        if (msg.kind === "response") this.self = name;
+        if (msg.kind === "response") {
+          this.self = name;
+          this.selfId = id;
+        }
       }
     }
   }
 
   handle(msg: PhotonMessage) {
     this.learnIdentities(msg);
+    this.handleFame(msg);
     const config = this.config;
     if (!config) return;
     const sig = messageSignature(msg);
@@ -205,6 +226,35 @@ export class DamageMeter {
       }
       if (playerHit || playerHeal) this.lastActivityAt = Math.max(this.lastActivityAt ?? 0, msg.at);
     }
+  }
+
+  private handleFame(msg: PhotonMessage) {
+    const reward = readFameReward(msg);
+    if (!reward || !this.self || reward.objectId !== this.selfId) return;
+    const previous = this.fameCounters.get(this.self);
+    if (previous !== undefined && reward.cumulative <= previous) return;
+    this.fameCounters.delete(this.self);
+    this.fameCounters.set(this.self, reward.cumulative);
+    if (this.fameCounters.size > MAX_IDENTITIES) this.fameCounters.delete(this.fameCounters.keys().next().value!);
+    if (!this.session && this.options.autoSession) {
+      this.startSession(this.options.newId(msg.at), autoLabel(msg.at), msg.at, true);
+    }
+    const session = this.session;
+    if (!session || msg.at < session.startedAt || (session.fame && session.fame.name !== this.self)) return;
+    const fame = session.fame ??= {
+      name: this.self, total: 0, zoneIncluded: 0, premium: 0, satchel: 0, events: 0,
+      lastAt: msg.at, lastBonusPercent: null,
+    };
+    fame.total += reward.total;
+    fame.zoneIncluded += reward.zoneIncluded;
+    fame.premium += reward.premium;
+    fame.satchel += reward.satchel;
+    fame.events++;
+    if (msg.at >= fame.lastAt) {
+      fame.lastAt = msg.at;
+      fame.lastBonusPercent = reward.lastBonusPercent;
+    }
+    this.lastActivityAt = Math.max(this.lastActivityAt ?? 0, msg.at);
   }
 
   private learn(id: number, name: string) {

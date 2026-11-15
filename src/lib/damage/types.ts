@@ -63,6 +63,20 @@ export type PlayerStats = {
   lastAt: number | null;
 };
 
+/** Own character only: captured UpdateFame rewards, not a party-wide estimate. */
+export type FameStats = {
+  name: string;
+  total: number;
+  /** Reward with its zone multiplier, before Premium and Satchel. */
+  zoneIncluded: number;
+  premium: number;
+  satchel: number;
+  events: number;
+  lastAt: number;
+  /** Latest reported modifier; already included in the reward, never multiplied again. */
+  lastBonusPercent: number | null;
+};
+
 export type SessionRecord = {
   id: string;
   label: string;
@@ -70,6 +84,8 @@ export type SessionRecord = {
   /** null while the session is running. */
   endedAt: number | null;
   players: PlayerStats[];
+  /** Optional for older saved sessions. Null means no own-character Fame reward was captured. */
+  fame?: FameStats | null;
   /** Damage on non-players whose causer could not be matched to a player name (pets, unseen players). */
   unattributedDamage: number;
   configCalibratedAt: string | null;
@@ -81,6 +97,7 @@ export type SessionSummary = Pick<SessionRecord, "id" | "label" | "startedAt" | 
   totalDamage: number;
   playerCount: number;
   topPlayer: string | null;
+  fame?: Pick<FameStats, "name" | "total"> | null;
 };
 
 export function summarizeSession(s: SessionRecord): SessionSummary {
@@ -92,7 +109,8 @@ export function summarizeSession(s: SessionRecord): SessionSummary {
     endedAt: s.endedAt,
     unattributedDamage: s.unattributedDamage,
     totalDamage: s.players.reduce((sum, p) => sum + p.damage, 0),
-    playerCount: s.players.length,
+    playerCount: new Set([...s.players.map((p) => p.name), ...(s.fame ? [s.fame.name] : [])]).size,
     topPlayer: sorted[0]?.damage ? sorted[0].name : null,
+    fame: s.fame ? { name: s.fame.name, total: s.fame.total } : null,
   };
 }

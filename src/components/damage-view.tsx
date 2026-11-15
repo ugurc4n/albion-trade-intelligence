@@ -113,6 +113,47 @@ function Disclosure({ title, children, defaultOpen = false }: { title: ReactNode
 
 /* ---------- player table ---------- */
 
+function FameSummary({ session, now }: { session: SessionRecord; now: number }) {
+  const fame = session.fame;
+  if (!fame) return (
+    <div className="border-b border-border px-3 py-3 text-xs text-muted-foreground">
+      <span lang="en" className="font-medium text-foreground">Personal Fame</span> · Bu oturumda kendi karakterine ait Fame kaydı yok.
+      {!session.endedAt && " Yakalayıcı açıkken bölge değiştir; Fame kazandığında burada görünür."}
+    </div>
+  );
+  const seconds = Math.max(1, ((session.endedAt ?? now) - session.startedAt) / 1000);
+  const metrics = [
+    ["Total Fame", formatSilver(fame.total)],
+    ["Fame/hour", formatSilver(fame.total * 3600 / seconds)],
+    ["Fame (zone incl.)", formatSilver(fame.zoneIncluded)],
+    ["Premium bonus", formatSilver(fame.premium)],
+    ["Satchel bonus", formatSilver(fame.satchel)],
+    ["Bonus modifier (last)", fame.lastBonusPercent === null ? "Bilinmiyor" : `%${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(fame.lastBonusPercent)}`],
+  ];
+  return (
+    <div className="border-b border-border bg-fuchsia-500/5 px-3 py-3">
+      <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+        <span lang="en" className="font-medium">Personal Fame</span>
+        <span className="font-medium text-fuchsia-300">{fame.name}</span>
+        <span className="text-muted-foreground">· yalnızca bu oturumda alınan ödüller</span>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 xl:grid-cols-6">
+        {metrics.map(([label, value]) => (
+          <div key={label}>
+            <dt lang="en" className="text-[11px] text-muted-foreground">{label}</dt>
+            <dd className="num mt-1 text-base font-semibold">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+        Total Fame, zone dahil Fame ile Premium ve Satchel katkılarının toplamıdır.
+        Bonus modifier son ödülde bildirilen orandır; Fame&apos;e zaten dahil olduğundan tekrar eklenmez.
+        Buff adı ve kalan süresi bu kayıtta bulunmaz. Kayıt sırasında alınamayan ödüller dahil değildir.
+      </p>
+    </div>
+  );
+}
+
 function MainHandCell({ player }: { player: PlayerStats }) {
   const observation = player.mainHand;
   if (!observation) return <span className="text-xs text-muted-foreground" title="Main Hand bilgisi henüz alınmadı.">Bilinmiyor</span>;
@@ -150,14 +191,19 @@ function PlayerTable({
 
   if (players.length === 0) {
     return (
-      <EmptyState title="Henüz damage yok">
-        Oturum açık; vuruşlar geldikçe burada görünür. Bir oyuncunun adı çıkmıyorsa, o oyuncu bölgeye girdiğinde yakalayıcının
-        çalışıyor olması gerekir (isimler bölgeye girişte gelir).
+      <>
+      <FameSummary session={session} now={now} />
+      <EmptyState title={session.endedAt !== null ? "Damage kaydı yok" : "Henüz damage yok"}>
+        {session.endedAt !== null ? "Bu oturumda eşleşen Damage kaydı bulunmuyor." :
+          "Oturum açık; vuruşlar geldikçe burada görünür. Bir oyuncunun adı çıkmıyorsa, o oyuncu bölgeye girdiğinde yakalayıcının çalışıyor olması gerekir (isimler bölgeye girişte gelir)."}
       </EmptyState>
+      </>
     );
   }
 
   return (
+    <>
+    <FameSummary session={session} now={now} />
     <div className="overflow-x-auto">
       <table className="w-full min-w-[840px] text-[13px]">
         <thead>
@@ -221,6 +267,7 @@ function PlayerTable({
         )}
       </div>
     </div>
+    </>
   );
 }
 
@@ -550,7 +597,7 @@ function AutomationPanel({ s }: { s: DamageState }) {
           <label className="flex items-center justify-between gap-3 rounded-md border border-border px-2.5 py-2">
             <span>
               <span className="block font-medium">Otomatik oturum</span>
-              <span className="text-muted-foreground">İlk vuruşta başlar, sessizlikte kaydedilir.</span>
+              <span className="text-muted-foreground">İlk vuruşta veya kendi Fame ödülünde başlar.</span>
             </span>
             <Switch checked={s.settings.autoSession} onCheckedChange={(v) => set({ autoSession: v })} />
           </label>
@@ -641,7 +688,7 @@ export function DamageView() {
     <div className="pb-8">
       <PageHeader section="damage"
         title="Damage Meter"
-        description="Party için Damage, Healing ve Damage Taken dökümü. Yakalayıcıyı aç, static'i dön; oturum ilk vuruşta başlar ve bitince kendiliğinden kaydedilir."
+        description="Party için Damage, Healing ve Damage Taken; kendi karakterin için Fame ve bonus dökümü. Oturum ilk vuruşta veya kendi Fame ödülünde başlar."
       />
       <div className="space-y-3 px-3 lg:px-4">
         <div className="flex gap-2.5 rounded-lg border border-border bg-card p-3 text-xs leading-relaxed">
@@ -686,7 +733,7 @@ export function DamageView() {
                   <>
                     <p className="mr-auto text-xs text-muted-foreground">
                       <span className="text-foreground">{s!.session.label}</span>
-                      {s!.session.auto && ` · ${s!.settings.idleMinutes} dk vuruş olmazsa kendiliğinden kaydedilir`}
+                      {s!.session.auto && ` · ${s!.settings.idleMinutes} dk etkinlik olmazsa kendiliğinden kaydedilir`}
                     </p>
                     <Button size="sm" variant="destructive" onClick={() => stop.mutate()} disabled={stop.isPending}>
                       {stop.isPending ? <Loader2 className="animate-spin" /> : <Square />} Şimdi bitir ve kaydet
@@ -697,8 +744,8 @@ export function DamageView() {
                     <p className="mr-auto text-xs text-muted-foreground">
                       {s!.settings.autoSession
                         ? s!.config
-                          ? "Bekleniyor: ilk vuruşta oturum kendiliğinden başlar."
-                          : "Damage olayı tanındığında (ilk savaşta) oturum kendiliğinden başlar."
+                          ? "Bekleniyor: ilk vuruşta veya kendi Fame ödülünde oturum kendiliğinden başlar."
+                          : "Kendi Fame ödülün veya Damage olayı tanındığında oturum kendiliğinden başlar."
                         : "Otomatik oturum kapalı; elle başlat."}
                     </p>
                     <label className="flex min-w-48 flex-col gap-1">
@@ -711,7 +758,7 @@ export function DamageView() {
                         maxLength={80}
                       />
                     </label>
-                    <Button size="sm" variant="outline" onClick={() => start.mutate()} disabled={start.isPending || !s!.config}>
+                    <Button size="sm" variant="outline" onClick={() => start.mutate()} disabled={start.isPending || (!s!.config && !s!.capture.selfName)}>
                       {start.isPending ? <Loader2 className="animate-spin" /> : <Play />} Elle başlat
                     </Button>
                   </>
@@ -772,7 +819,8 @@ export function DamageView() {
                             </span>
                           </button>
                           <span className="text-muted-foreground">
-                            Toplam <span className="num text-foreground">{formatCompact(x.totalDamage)}</span>
+                            Damage <span className="num text-foreground">{formatCompact(x.totalDamage)}</span>
+                            {x.fame && <> · Fame <span className="num text-foreground">{formatCompact(x.fame.total)}</span></>}
                             {x.topPlayer && (
                               <>
                                 {" "}
@@ -812,7 +860,7 @@ export function DamageView() {
             <p className="text-[11px] leading-relaxed text-muted-foreground/80">
               Sayılar, yakalayıcının çalıştığı oyuncunun istemcisine gelen olaylardır: görüş menzili dışındaki party üyelerinin vuruşları
               eksik olabilir. Pet/summon damage&apos;i &quot;eşleşmeyen&quot; olarak ayrı gösterilir. Self-healing ve
-              PvP damage, Damage toplamına sayılmaz. Healing, overhealing içerebilir. Çok kısa (10 vuruştan az)
+              PvP damage, Damage toplamına sayılmaz. Healing, overhealing içerebilir. Fame ödülü olmayan çok kısa (10 vuruştan az)
               otomatik oturumlar kaydedilmez. Main Hand sütunu son görülen ekipmanı gösterir; silah değiştikçe güncellenir.
             </p>
           </>

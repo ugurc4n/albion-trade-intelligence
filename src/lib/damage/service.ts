@@ -32,7 +32,7 @@ const MAX_RECORDING_PACKETS = 60_000;
 const MAX_RECORDING_MS = 10 * 60_000;
 const CONNECTED_WINDOW_MS = 5_000;
 /** Bump when the shape of the service changes, so dev hot-reloads do not keep a stale singleton. */
-const SERVICE_VERSION = 5;
+const SERVICE_VERSION = 6;
 
 export type RawPacket = { t: number; d: string };
 
@@ -250,7 +250,7 @@ export class DamageStateError extends Error {}
 export async function startSession(label: string): Promise<SessionRecord> {
   const svc = service();
   await svc.ready;
-  if (!svc.meter.getConfig()) throw new DamageStateError("Henüz kalibrasyon yok: bir mob'a vurduğunda otomatik yapılacak.");
+  if (!svc.meter.getConfig() && !svc.meter.selfName) throw new DamageStateError("Damage kalibrasyonu veya kendi karakterinin tanınması bekleniyor; yakalayıcı açıkken bölge değiştir.");
   if (svc.meter.snapshot()) throw new DamageStateError("Zaten çalışan bir oturum var.");
   const now = streamNow(svc, Date.now());
   return svc.meter.startSession(newId(now), label.trim() || `Oturum ${new Date(now).toLocaleString("tr-TR")}`, now);
