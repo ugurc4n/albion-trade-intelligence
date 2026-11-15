@@ -159,6 +159,21 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /out:AlbionCaptu
 - C# yakalayıcı macOS'ta derlenemez; Windows'ta (yerleşik `csc.exe`) derlenip gerçek oyunla denendi.
 - Parti üyeleri otomatik algılanmaz; tabloda bölgede vuran tüm oyuncular görünür, isteğe bağlı isim filtresi vardır.
 
+## Masaüstü uygulaması (Windows)
+
+Tek pencerelik Windows uygulaması: market, Avalon ve damage meter aynı yerde, terminal yok. Damage Meter'daki **Başlat** düğmesi paket yakalayıcıyı arka planda çalıştırır (Windows bir kez yönetici izni sorar); **Durdur** ya da uygulamayı kapatmak onu durdurur.
+
+**Kurulum dosyası üretmek (Windows PC'de, GitHub gerekmez):**
+1. [nodejs.org](https://nodejs.org/) adresinden **LTS** sürümünü kur.
+2. Bu depoyu ZIP olarak indirip bir klasöre çıkar.
+3. `build-windows.cmd` dosyasına çift tıkla. Bitince `dist-electron\AlbionTradeIntelligence-Setup-<sürüm>.exe` açılır.
+
+**GitHub Actions:** `.github/workflows/desktop.yml` aynı adımları GitHub'ın Windows makinesinde çalıştırır (elle "Run workflow" ya da `v*` etiketiyle; etikette Release'e de yükler). Hesapta fatura kilidi varsa GitHub iş akışını başlatmaz.
+
+**Paylaşma:** Setup.exe sıradan bir dosyadır (Drive, WeTransfer, USB). Kurulum tek tıklıktır ve yönetici izni istemez. Uygulama imzasız olduğundan Windows ilk açılışta "Bilgisayarınızı korudu" uyarısı gösterir: *Ek bilgi → Yine de çalıştır*.
+
+**Nasıl çalışır:** `electron/main.js`, Next.js'in standalone sunucusunu (`npm run build:desktop` → `.next-electron/standalone`) boş bir loopback portunda Electron utility process olarak başlatıp pencerede gösterir. Kullanıcı verisi `%APPDATA%\albionprofit\data` altındadır (`ATI_DATA_DIR`). Yakalayıcı `/target:winexe` ile konsolsuz derlenir ve `--parent <pid>` ile çağrılır; her ~2 sn'de bir boş paketle "kalp atışı" gönderir, uygulama "dur" dediğinde, sunucu süreci kapandığında ya da 20 sn ulaşılamadığında kendini kapatır.
+
 ## Sınırlamalar
 
 - Veriler, Albion Data Client çalıştıran oyuncuların gördüğü kadardır: kapsama eksik, gecikmeli ve şehre göre değişken olabilir. History `item_count` gerçek hacmin alt sınırıdır.
