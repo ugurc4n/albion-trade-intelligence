@@ -33,8 +33,8 @@ jobs:
       - name: Compile the packet capture (built-in .NET Framework compiler, no console window)
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force build/capture | Out-Null
-          & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /out:build/capture/AlbionCapture.exe tools/albion-capture/AlbionCapture.cs
+          New-Item -ItemType Directory -Force build\capture | Out-Null
+          & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /out:build\capture\AlbionCapture.exe tools\albion-capture\AlbionCapture.cs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build the standalone app server
