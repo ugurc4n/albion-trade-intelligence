@@ -1,8 +1,18 @@
+import type { NextRequest } from "next/server";
 import { controlBodySchema } from "@/lib/damage/api-schemas";
-import { saveConfig, saveSettings, startRecording, startSession, stopRecording, stopSession } from "@/lib/damage/service";
+import {
+  saveConfig,
+  saveSettings,
+  startCapture,
+  startRecording,
+  startSession,
+  stopCapture,
+  stopRecording,
+  stopSession,
+} from "@/lib/damage/service";
 import { damageErrorResponse } from "../errors";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = controlBodySchema.parse(await request.json());
     switch (body.action) {
@@ -22,6 +32,15 @@ export async function POST(request: Request) {
         return Response.json({ ok: true });
       case "settings-save":
         await saveSettings(body.settings);
+        return Response.json({ ok: true });
+      case "capture-start": {
+        // The capture posts back to this same server over loopback.
+        const port = process.env.PORT ?? request.nextUrl.port;
+        startCapture(`http://127.0.0.1:${port}`);
+        return Response.json({ ok: true });
+      }
+      case "capture-stop":
+        stopCapture();
         return Response.json({ ok: true });
     }
   } catch (err) {

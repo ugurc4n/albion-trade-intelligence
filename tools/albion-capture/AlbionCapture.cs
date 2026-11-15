@@ -12,10 +12,16 @@
 // Run from an Administrator command prompt (Windows only allows raw sockets for administrators):
 //   .\AlbionCapture.exe http://<app-ip>:3100     (PowerShell needs the leading .\)
 //
+// The desktop app starts it for you (Start button, one Windows permission prompt) with
+//   AlbionCapture.exe http://127.0.0.1:<port> --parent <app server pid>
+// and it exits on its own when the app says stop, when that process ends, or when the app stays unreachable.
+// The desktop build is compiled with /target:winexe so no console window appears.
+//
 // Written in C# 5 on purpose so the built-in compiler accepts it.
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -42,11 +48,30 @@ namespace AlbionCapture
         private static long failedPosts;
         private static string lastPostError;
         private static volatile bool running = true;
+        private static int parentPid;
+        private static DateTime lastPostUtc = DateTime.MinValue;
+        private static DateTime failingSinceUtc = DateTime.MinValue;
+
+        /** With --parent: give up after this long without reaching the app (it was closed). */
+        private const int UnreachableExitSeconds = 20;
+        /** Post an empty batch at least this often so the app can tell us to stop even when the game is idle. */
+        private const int HeartbeatMs = 2000;
 
         private static int Main(string[] args)
         {
-            Console.OutputEncoding = Encoding.UTF8;
+            try
+            {
+                Console.OutputEncoding = Encoding.UTF8;
+            }
+            catch (Exception)
+            {
+                // No console (winexe build): output is simply discarded.
+            }
             string app = args.Length > 0 ? args[0].Trim().TrimEnd('/') : "http://localhost:3100";
+            for (int i = 1; i + 1 < args.Length; i++)
+            {
+                if (args[i] == "--parent") int.TryParse(args[i + 1], out parentPid);
+            }
             Uri appUri;
             if (!Uri.TryCreate(app, UriKind.Absolute, out appUri) || (appUri.Scheme != "http" && appUri.Scheme != "https"))
             {
@@ -89,20 +114,33 @@ namespace AlbionCapture
             string ingestUrl = app + "/api/damage/ingest";
             Console.WriteLine("Paketler gönderiliyor: " + ingestUrl);
             Console.WriteLine("Durdurmak için Ctrl+C.");
-            Console.CancelKeyPress += delegate(object sender, ConsoleCancelEventArgs e)
+            try
             {
-                e.Cancel = true;
-                running = false;
-            };
+                Console.CancelKeyPress += delegate(object sender, ConsoleCancelEventArgs e)
+                {
+                    e.Cancel = true;
+                    running = false;
+                };
+            }
+            catch (Exception)
+            {
+                // No console attached.
+            }
 
             Thread senderThread = new Thread(() => SendLoop(ingestUrl));
             senderThread.IsBackground = true;
             senderThread.Start();
 
             DateTime nextStatus = DateTime.UtcNow.AddSeconds(5);
+            DateTime nextParentCheck = DateTime.UtcNow.AddSeconds(2);
             while (running)
             {
                 Thread.Sleep(250);
+                if (parentPid > 0 && DateTime.UtcNow >= nextParentCheck)
+                {
+                    nextParentCheck = DateTime.UtcNow.AddSeconds(2);
+                    if (!ParentAlive()) running = false;
+                }
                 if (DateTime.UtcNow < nextStatus) continue;
                 nextStatus = DateTime.UtcNow.AddSeconds(5);
                 string line = string.Format(
@@ -119,6 +157,25 @@ namespace AlbionCapture
             }
             Console.WriteLine("Durduruldu.");
             return 0;
+        }
+
+        private static bool ParentAlive()
+        {
+            try
+            {
+                using (Process parent = Process.GetProcessById(parentPid))
+                {
+                    return !parent.HasExited;
+                }
+            }
+            catch (ArgumentException)
+            {
+                return false; // no process with that id any more
+            }
+            catch (Exception)
+            {
+                return true; // could not inspect it (permissions): assume it is still there
+            }
         }
 
         private static bool IsAdministrator()
@@ -237,7 +294,8 @@ namespace AlbionCapture
                     {
                         while (Pending.Count > 0 && batch.Count < MaxBatch) batch.Add(Pending.Dequeue());
                     }
-                    if (batch.Count == 0) continue;
+                    bool heartbeatDue = (DateTime.UtcNow - lastPostUtc).TotalMilliseconds >= HeartbeatMs;
+                    if (batch.Count == 0 && !heartbeatDue) continue;
 
                     StringBuilder sb = new StringBuilder("{\"packets\":[");
                     for (int i = 0; i < batch.Count; i++)
@@ -251,14 +309,22 @@ namespace AlbionCapture
                     try
                     {
                         client.Headers[HttpRequestHeader.ContentType] = "application/json";
-                        client.UploadString(url, "POST", sb.ToString());
+                        string reply = client.UploadString(url, "POST", sb.ToString());
                         Interlocked.Add(ref forwarded, batch.Count);
+                        lastPostUtc = DateTime.UtcNow;
+                        failingSinceUtc = DateTime.MinValue;
+                        // The app answers {"...","stop":true} when its Stop button was pressed.
+                        if (reply != null && reply.Replace(" ", "").Contains("\"stop\":true")) running = false;
                     }
                     catch (WebException ex)
                     {
                         Interlocked.Increment(ref failedPosts);
                         Interlocked.Add(ref dropped, batch.Count);
                         lastPostError = ex.Message;
+                        lastPostUtc = DateTime.UtcNow;
+                        if (failingSinceUtc == DateTime.MinValue) failingSinceUtc = DateTime.UtcNow;
+                        // Started by the desktop app and it has been unreachable for a while: it was closed.
+                        if (parentPid > 0 && (DateTime.UtcNow - failingSinceUtc).TotalSeconds > UnreachableExitSeconds) running = false;
                     }
                 }
             }

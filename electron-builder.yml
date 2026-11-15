@@ -1,0 +1,35 @@
+# Windows installer for Albion Trade Intelligence (built on GitHub Actions: .github/workflows/desktop.yml)
+appId: com.ugurc4n.albiontradeintelligence
+productName: Albion Trade Intelligence
+directories:
+  output: dist-electron
+  buildResources: electron/build
+# Only the Electron shell goes into app.asar; the web app ships as a ready-made standalone server.
+files:
+  - electron/**/*
+  - package.json
+  - "!node_modules/**/*"
+extraResources:
+  - from: .next-electron/standalone
+    to: server
+    filter:
+      - "**/*"
+  - from: build/capture
+    to: capture
+    filter:
+      - "AlbionCapture.exe"
+npmRebuild: false
+win:
+  icon: electron/build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: AlbionTradeIntelligence-Setup-${version}.${ext}
+nsis:
+  # One click, per-user install (no admin rights needed to install).
+  oneClick: true
+  perMachine: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Albion Trade Intelligence
+  deleteAppDataOnUninstall: false

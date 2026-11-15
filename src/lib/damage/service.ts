@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { networkInterfaces } from "node:os";
 import path from "node:path";
 import { AutoCalibrator, type AutoCalibrationStatus } from "./auto-calibrator";
+import { launcher, type LauncherStatus } from "./capture-launcher";
 import { analyzeCalibration, type CalibrationResult } from "./calibrate";
 import { DamageMeter } from "./meter";
 import { PhotonDecoder, type DecodeStats, type PhotonMessage } from "./photon";
@@ -17,7 +18,10 @@ import {
   type SessionSummary,
 } from "./types";
 
-const DATA_DIR = path.join(process.cwd(), ".data", "damage");
+/** The desktop app points ATI_DATA_DIR at the user's AppData folder; in development data stays in ./.data. */
+const DATA_DIR = process.env.ATI_DATA_DIR
+  ? path.join(process.env.ATI_DATA_DIR, "damage")
+  : path.join(process.cwd(), ".data", "damage");
 const SESSIONS_DIR = path.join(DATA_DIR, "sessions");
 const CAPTURES_DIR = path.join(DATA_DIR, "captures");
 const CONFIG_FILE = path.join(DATA_DIR, "config.json");
@@ -135,7 +139,7 @@ async function closeIdleSession(svc: DamageService, now: number) {
   }
 }
 
-export async function ingestPackets(packets: RawPacket[]): Promise<{ accepted: number; messages: number }> {
+export async function ingestPackets(packets: RawPacket[]): Promise<{ accepted: number; messages: number; stop: boolean }> {
   const svc = service();
   await svc.ready;
   const localNow = Date.now();
@@ -169,7 +173,8 @@ export async function ingestPackets(packets: RawPacket[]): Promise<{ accepted: n
     if (decision) await applyConfig(svc, decision.config, decision.reason === "identity-added" ? "identities" : "full");
   }
   await closeIdleSession(svc, streamNow(svc, localNow));
-  return { accepted: packets.length, messages: decoded.length };
+  // An empty batch is the capture's heartbeat; the reply tells it whether to keep running.
+  return { accepted: packets.length, messages: decoded.length, stop: launcher().heartbeat(localNow) };
 }
 
 export type DamageState = {
@@ -193,6 +198,8 @@ export type DamageState = {
   lastCaptureId: string | null;
   /** Addresses the Windows capture program can POST to (this machine's LAN IPs). */
   ingestUrls: string[];
+  /** Start/stop control for the bundled capture (desktop app on Windows only). */
+  launcher: LauncherStatus;
 };
 
 export async function getDamageState(port: string | null): Promise<DamageState> {
@@ -226,6 +233,7 @@ export async function getDamageState(port: string | null): Promise<DamageState> 
       : null,
     lastCaptureId: svc.lastCapture?.id ?? null,
     ingestUrls: lanAddresses().map((ip) => `http://${ip}${port ? `:${port}` : ""}`),
+    launcher: launcher().status(localNow),
   };
 }
 
@@ -345,4 +353,16 @@ export async function saveConfig(config: DamageConfig | null): Promise<void> {
     svc.meter.setConfig(null);
     await writeConfig(null);
   }
+}
+
+/** Desktop app: start the bundled capture (shows the Windows UAC prompt). `appBaseUrl` is this server's own address. */
+export function startCapture(appBaseUrl: string) {
+  if (!launcher().available()) {
+    throw new DamageStateError("Başlat düğmesi yalnızca Windows masaüstü uygulamasında çalışır. Burada yakalayıcıyı elle çalıştır.");
+  }
+  launcher().start(appBaseUrl, Date.now());
+}
+
+export function stopCapture() {
+  launcher().stop(Date.now());
 }

@@ -205,8 +205,54 @@ function PlayerTable({
 
 /* ---------- connection ---------- */
 
+const LAUNCHER_TEXT: Record<DamageState["launcher"]["state"], string> = {
+  idle: "Kapalı",
+  starting: "Başlatılıyor…",
+  running: "Çalışıyor",
+  stopping: "Durduruluyor…",
+  denied: "İzin verilmedi",
+  error: "Başlatılamadı",
+};
+
+/** Desktop app: one big Start/Stop button instead of terminal instructions. */
+function LauncherControl({ s }: { s: DamageState }) {
+  const qc = useQueryClient();
+  const l = s.launcher;
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["damage-state"] });
+  const start = useMutation({ mutationFn: () => damageApi.control({ action: "capture-start" }), onSuccess: invalidate });
+  const stop = useMutation({ mutationFn: () => damageApi.control({ action: "capture-stop" }), onSuccess: invalidate });
+  const active = l.state === "running" || l.state === "starting";
+  const busy = start.isPending || stop.isPending || l.state === "stopping";
+  const error = start.error ?? stop.error;
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-fuchsia-400/25 bg-fuchsia-500/8 p-3">
+      {active ? (
+        <Button size="lg" variant="outline" onClick={() => stop.mutate()} disabled={busy} className="min-w-36">
+          {busy ? <Loader2 className="animate-spin" /> : <Square />} Durdur
+        </Button>
+      ) : (
+        <Button size="lg" onClick={() => start.mutate()} disabled={busy} className="min-w-36 bg-fuchsia-500 text-white hover:bg-fuchsia-400">
+          {busy ? <Loader2 className="animate-spin" /> : <Play />} Başlat
+        </Button>
+      )}
+      <div className="min-w-0 flex-1 text-xs leading-relaxed">
+        <p className="font-medium">{LAUNCHER_TEXT[l.state]}</p>
+        <p className="text-muted-foreground">
+          {l.message ??
+            (l.state === "running"
+              ? "Oyun trafiği okunuyor. Uygulamayı kapatınca kendiliğinden durur."
+              : "Başlat'a bas; Windows bir kez izin soracak, “Evet” de.")}
+        </p>
+        {error && <p className="text-loss">{error.message}</p>}
+      </div>
+    </div>
+  );
+}
+
 function ConnectionPanel({ s }: { s: DamageState }) {
   const c = s.capture;
+  const desktop = s.launcher.available;
   return (
     <Panel
       title={
@@ -244,7 +290,9 @@ function ConnectionPanel({ s }: { s: DamageState }) {
             <dd className="num">{c.decode.errors + c.decode.encrypted}</dd>
           </div>
         </dl>
-        <Disclosure title="Kurulum (Windows)" defaultOpen={!c.connected && c.packetsReceived === 0}>
+        {desktop && <LauncherControl s={s} />}
+        {!desktop && (
+          <Disclosure title="Kurulum (Windows)" defaultOpen={!c.connected && c.packetsReceived === 0}>
           <ol className="space-y-3">
             <Step n={1}>
               <p>
@@ -271,7 +319,8 @@ function ConnectionPanel({ s }: { s: DamageState }) {
               </p>
             </Step>
           </ol>
-        </Disclosure>
+          </Disclosure>
+        )}
         {c.decode.lastError && c.decode.errors > 0 && (
           <p className="text-[11px] text-muted-foreground">
             Son çözme hatası: <span className="num">{c.decode.lastError}</span>

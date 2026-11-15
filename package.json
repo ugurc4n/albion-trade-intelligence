@@ -13,7 +13,11 @@
     "catalog": "tsx scripts/build-catalog.ts",
     "smoke": "tsx scripts/smoke.ts",
     "avalon": "tsx scripts/build-avalon.ts",
-    "damage:simulate": "tsx scripts/damage-simulate.ts"
+    "damage:simulate": "tsx scripts/damage-simulate.ts",
+    "build:desktop": "node scripts/build-desktop.mjs",
+    "desktop": "electron .",
+    "dist:win": "electron-builder --win --publish never",
+    "icon": "node scripts/make-icon.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -35,11 +39,16 @@
     "@types/node": "^24.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "tailwindcss": "4.3.3",
     "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.1.0"
-  }
+  },
+  "description": "Albion Online trade decision support, Avalon roads lookup and damage meter",
+  "author": "ugurc4n",
+  "main": "electron/main.js"
 }

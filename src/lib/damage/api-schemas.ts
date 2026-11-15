@@ -15,6 +15,8 @@ export const controlBodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("config-save"), config: damageConfigSchema }),
   z.object({ action: z.literal("config-clear") }),
   z.object({ action: z.literal("settings-save"), settings: damageSettingsSchema }),
+  z.object({ action: z.literal("capture-start") }),
+  z.object({ action: z.literal("capture-stop") }),
 ]);
 
 export const calibrateBodySchema = z.object({
