@@ -16,6 +16,11 @@ const eslintConfig = defineConfig([
     ".next-electron/**",
     "dist-electron/**",
   ]),
+  // The Electron main process is plain CommonJS (loaded directly by Electron, no bundler).
+  {
+    files: ["electron/**/*.js"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
 ]);
 
 export default eslintConfig;
