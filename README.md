@@ -172,7 +172,7 @@ Tek pencerelik Windows uygulaması: market, Avalon ve damage meter aynı yerde, 
 
 **Paylaşma:** Setup.exe sıradan bir dosyadır (Drive, WeTransfer, USB). Kurulum tek tıklıktır ve yönetici izni istemez. Uygulama imzasız olduğundan Windows ilk açılışta "Bilgisayarınızı korudu" uyarısı gösterir: *Ek bilgi → Yine de çalıştır*.
 
-**Nasıl çalışır:** `electron/main.js`, Next.js'in standalone sunucusunu (`npm run build:desktop` → `.next-electron/standalone`) boş bir loopback portunda Electron utility process olarak başlatıp pencerede gösterir. Kullanıcı verisi `%APPDATA%\albionprofit\data` altındadır (`ATI_DATA_DIR`). Yakalayıcı `/target:winexe` ile konsolsuz derlenir ve `--parent <pid>` ile çağrılır; her ~2 sn'de bir boş paketle "kalp atışı" gönderir, uygulama "dur" dediğinde, sunucu süreci kapandığında ya da 20 sn ulaşılamadığında kendini kapatır.
+**Nasıl çalışır:** `electron/main.js`, Next.js'in standalone sunucusunu (`npm run build:desktop` → `.next-electron/standalone`) boş bir loopback portunda Electron utility process olarak başlatıp pencerede gösterir. Kullanıcı verisi `%APPDATA%\Albion Trade Intelligence\data` altındadır (`ATI_DATA_DIR`). Yakalayıcı `/target:winexe` ile konsolsuz derlenir ve `--parent <pid>` ile çağrılır; her ~2 sn'de bir boş paketle "kalp atışı" gönderir, uygulama "dur" dediğinde, sunucu süreci kapandığında ya da 20 sn ulaşılamadığında kendini kapatır.
 
 ## Sınırlamalar
 
