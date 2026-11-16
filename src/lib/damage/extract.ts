@@ -17,6 +17,16 @@ export function isIdTag(tag: string | undefined): boolean {
   return tag === "l" || tag === "y:l";
 }
 
+const FIXED_POINT_FACTOR = 10_000;
+
+/** Albion fixed-point amount (Fame, silver): a non-negative long scaled by 10,000; null if absent or malformed. */
+export function fixedPoint(msg: { params: Map<number, PhotonValue>; types: Map<number, string> }, key: number): number | null {
+  const value = msg.params.get(key);
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && isIdTag(msg.types.get(key))
+    ? value / FIXED_POINT_FACTOR
+    : null;
+}
+
 export function isIntTag(tag: string | undefined): boolean {
   return tag === "b" || tag === "k" || tag === "i" || tag === "l" || tag === "n" || tag === "y:b" || tag === "y:k" || tag === "y:i" || tag === "y:l";
 }

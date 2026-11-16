@@ -154,6 +154,44 @@ function FameSummary({ session, now }: { session: SessionRecord; now: number }) 
   );
 }
 
+function SilverSummary({ session, now }: { session: SessionRecord; now: number }) {
+  const silver = session.silver;
+  if (!silver) return (
+    <div className="border-b border-border px-3 py-3 text-xs text-muted-foreground">
+      <span lang="en" className="font-medium text-foreground">Silver</span> · Bu oturumda yerden toplanan silver kaydı yok.
+    </div>
+  );
+  const seconds = Math.max(1, ((session.endedAt ?? now) - session.startedAt) / 1000);
+  const metrics = [
+    ["Picked up", formatSilver(silver.net)],
+    ["Silver/hour", formatSilver(silver.net * 3600 / seconds)],
+    ["Before tax", formatSilver(silver.preTax)],
+    ["Tax", formatSilver(silver.tax)],
+    ["Pickups", String(silver.pickups)],
+  ];
+  return (
+    <div className="border-b border-border bg-amber-500/5 px-3 py-3">
+      <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+        <span lang="en" className="font-medium">Silver</span>
+        <span className="font-medium text-amber-300">{silver.name}</span>
+        <span className="text-muted-foreground">· yalnızca bu oturumda yerden toplanan</span>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 xl:grid-cols-6">
+        {metrics.map(([label, value]) => (
+          <div key={label}>
+            <dt lang="en" className="text-[11px] text-muted-foreground">{label}</dt>
+            <dd className="num mt-1 text-base font-semibold">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+        Picked up, bölge ve lonca vergisi düşüldükten sonra cebine giren silver&apos;dır. Party&apos;de yalnızca kendi payın
+        sayılır. Satış, alış ve tamir harcamaları dahil değildir.
+      </p>
+    </div>
+  );
+}
+
 function MainHandCell({ player }: { player: PlayerStats }) {
   const observation = player.mainHand;
   if (!observation) {
@@ -202,6 +240,7 @@ function PlayerTable({
     return (
       <>
       <FameSummary session={session} now={now} />
+      <SilverSummary session={session} now={now} />
       <EmptyState title={session.endedAt !== null ? "Damage kaydı yok" : "Henüz damage yok"}>
         {session.endedAt !== null ? "Bu oturumda eşleşen Damage kaydı bulunmuyor." :
           "Oturum açık; vuruşlar geldikçe burada görünür. Bir oyuncunun adı çıkmıyorsa, o oyuncu bölgeye girdiğinde yakalayıcının çalışıyor olması gerekir (isimler bölgeye girişte gelir)."}
@@ -213,6 +252,7 @@ function PlayerTable({
   return (
     <>
     <FameSummary session={session} now={now} />
+    <SilverSummary session={session} now={now} />
     <div className="overflow-x-auto">
       <table className="w-full min-w-[840px] text-[13px]">
         <thead>
@@ -830,6 +870,7 @@ export function DamageView() {
                           <span className="text-muted-foreground">
                             Damage <span className="num text-foreground">{formatCompact(x.totalDamage)}</span>
                             {x.fame && <> · Fame <span className="num text-foreground">{formatCompact(x.fame.total)}</span></>}
+                            {x.silver && <> · Silver <span className="num text-foreground">{formatCompact(x.silver.net)}</span></>}
                             {x.topPlayer && (
                               <>
                                 {" "}
@@ -869,7 +910,7 @@ export function DamageView() {
             <p className="text-[11px] leading-relaxed text-muted-foreground/80">
               Sayılar, yakalayıcının çalıştığı oyuncunun istemcisine gelen olaylardır: görüş menzili dışındaki party üyelerinin vuruşları
               eksik olabilir. Pet/summon damage&apos;i &quot;eşleşmeyen&quot; olarak ayrı gösterilir. Self-healing ve
-              PvP damage, Damage toplamına sayılmaz. Healing, overhealing içerebilir. Fame ödülü olmayan çok kısa (10 vuruştan az)
+              PvP damage, Damage toplamına sayılmaz. Healing, overhealing içerebilir. Fame ödülü veya silver toplaması olmayan çok kısa (10 vuruştan az)
               otomatik oturumlar kaydedilmez. Main Hand sütunu son görülen ekipmanı gösterir; silah değiştikçe güncellenir.
             </p>
           </>

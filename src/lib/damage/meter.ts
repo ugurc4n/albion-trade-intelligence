@@ -2,6 +2,7 @@ import { looksLikeCharacterName } from "./calibrate";
 import { expandRows, isIdTag, isObjectIdLike } from "./extract";
 import { EQUIPMENT_CHANGED_EVENT, NEW_CHARACTER_EVENT, mainHandFromIndex, readEquipmentItem, readJoinEquipment, readMainHand } from "./equipment";
 import { readFameReward } from "./fame";
+import { readSilverPickup } from "./silver";
 import { messageSignature, type PhotonMessage } from "./photon";
 import type { DamageConfig, MainHandObservation, PlayerStats, SessionRecord } from "./types";
 
@@ -56,6 +57,8 @@ export class DamageMeter {
   private selfId: number | null = null;
   /** Lifetime counters prevent UDP duplicates and calibration replay from counting rewards twice. */
   private fameCounters = new Map<string, number>();
+  /** Silver pickups already counted (tick:silver object), for the same duplicate/replay protection. */
+  private silverSeen = new Set<string>();
   /** Item object id → item index (NewEquipmentItem); used to resolve your own Main Hand. */
   private itemObjects = new Map<number, number>();
   /** Object ids of your equipped items from the last join reply (slot 0 = Main Hand). */
@@ -108,6 +111,7 @@ export class DamageMeter {
       endedAt: null,
       players: [],
       fame: null,
+      silver: null,
       unattributedDamage: 0,
       configCalibratedAt: this.config?.calibratedAt ?? null,
       auto,
@@ -137,7 +141,7 @@ export class DamageMeter {
     }
     const done = this.stopSession(this.lastActivityAt)!;
     const hits = done.players.reduce((sum, p) => sum + p.hits, 0);
-    return hits >= this.options.minHits || (done.fame?.events ?? 0) > 0
+    return hits >= this.options.minHits || (done.fame?.events ?? 0) > 0 || (done.silver?.pickups ?? 0) > 0
       ? { saved: done, discarded: false } : { saved: null, discarded: true };
   }
 
@@ -146,6 +150,7 @@ export class DamageMeter {
     return {
       ...this.session,
       fame: this.session.fame ? { ...this.session.fame } : null,
+      silver: this.session.silver ? { ...this.session.silver } : null,
       players: [...this.players.values()].map((p) => ({
         ...p,
         mainHand: p.mainHand ? { ...p.mainHand, item: p.mainHand.item ? { ...p.mainHand.item } : null } : null,
@@ -207,6 +212,7 @@ export class DamageMeter {
   handle(msg: PhotonMessage) {
     this.learnIdentities(msg);
     this.handleFame(msg);
+    this.handleSilver(msg);
     const config = this.config;
     if (!config) return;
     const sig = messageSignature(msg);
@@ -288,6 +294,29 @@ export class DamageMeter {
     this.lastActivityAt = Math.max(this.lastActivityAt ?? 0, msg.at);
   }
 
+  private handleSilver(msg: PhotonMessage) {
+    const pickup = readSilverPickup(msg);
+    // Only your own pickups: unlike UpdateFame, nothing guarantees TakeSilver is local-player only.
+    if (!pickup || !this.self || pickup.objectId !== this.selfId) return;
+    if (pickup.key !== null) {
+      if (this.silverSeen.has(pickup.key)) return;
+      this.silverSeen.add(pickup.key);
+      if (this.silverSeen.size > MAX_ITEM_OBJECTS) this.silverSeen.delete(this.silverSeen.keys().next().value!);
+    }
+    if (!this.session && this.options.autoSession) {
+      this.startSession(this.options.newId(msg.at), autoLabel(msg.at), msg.at, true);
+    }
+    const session = this.session;
+    if (!session || msg.at < session.startedAt || (session.silver && session.silver.name !== this.self)) return;
+    const silver = session.silver ??= { name: this.self, net: 0, preTax: 0, tax: 0, pickups: 0, lastAt: msg.at };
+    silver.net += pickup.net;
+    silver.preTax += pickup.preTax;
+    silver.tax += pickup.tax;
+    silver.pickups++;
+    silver.lastAt = Math.max(silver.lastAt, msg.at);
+    this.lastActivityAt = Math.max(this.lastActivityAt ?? 0, msg.at);
+  }
+
   /** Records your own character; a placeholder name (from Fame) is renamed in place once the join reply arrives. */
   private setSelf(id: number, name: string) {
     const previous = this.self;
@@ -332,6 +361,7 @@ export class DamageMeter {
       this.fameCounters.set(to, counter);
     }
     if (this.session?.fame?.name === from) this.session.fame.name = to;
+    if (this.session?.silver?.name === from) this.session.silver.name = to;
     for (const [id, n] of this.identities) if (n === from) this.identities.set(id, to);
   }
 

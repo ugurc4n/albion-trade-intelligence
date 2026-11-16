@@ -77,6 +77,17 @@ export type FameStats = {
   lastBonusPercent: number | null;
 };
 
+/** Own character only: silver picked up (TakeSilver), after cluster/guild tax. Not trades, repairs or sales. */
+export type SilverStats = {
+  name: string;
+  /** Received after taxes. */
+  net: number;
+  preTax: number;
+  tax: number;
+  pickups: number;
+  lastAt: number;
+};
+
 export type SessionRecord = {
   id: string;
   label: string;
@@ -86,6 +97,8 @@ export type SessionRecord = {
   players: PlayerStats[];
   /** Optional for older saved sessions. Null means no own-character Fame reward was captured. */
   fame?: FameStats | null;
+  /** Optional for older saved sessions. Null means no own silver pickup was captured. */
+  silver?: SilverStats | null;
   /** Damage on non-players whose causer could not be matched to a player name (pets, unseen players). */
   unattributedDamage: number;
   configCalibratedAt: string | null;
@@ -98,6 +111,7 @@ export type SessionSummary = Pick<SessionRecord, "id" | "label" | "startedAt" | 
   playerCount: number;
   topPlayer: string | null;
   fame?: Pick<FameStats, "name" | "total"> | null;
+  silver?: Pick<SilverStats, "name" | "net"> | null;
 };
 
 export function summarizeSession(s: SessionRecord): SessionSummary {
@@ -109,8 +123,9 @@ export function summarizeSession(s: SessionRecord): SessionSummary {
     endedAt: s.endedAt,
     unattributedDamage: s.unattributedDamage,
     totalDamage: s.players.reduce((sum, p) => sum + p.damage, 0),
-    playerCount: new Set([...s.players.map((p) => p.name), ...(s.fame ? [s.fame.name] : [])]).size,
+    playerCount: new Set([...s.players.map((p) => p.name), ...(s.fame ? [s.fame.name] : []), ...(s.silver ? [s.silver.name] : [])]).size,
     topPlayer: sorted[0]?.damage ? sorted[0].name : null,
     fame: s.fame ? { name: s.fame.name, total: s.fame.total } : null,
+    silver: s.silver ? { name: s.silver.name, net: s.silver.net } : null,
   };
 }

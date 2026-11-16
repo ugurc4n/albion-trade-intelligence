@@ -1,4 +1,4 @@
-import { isIdTag, isObjectIdLike } from "./extract";
+import { fixedPoint, isIdTag, isObjectIdLike } from "./extract";
 import type { PhotonMessage } from "./photon";
 
 /**
@@ -10,14 +10,6 @@ import type { PhotonMessage } from "./photon";
  * Event codes and layouts must be rechecked after game patches.
  */
 const UPDATE_FAME_EVENT = 82;
-const FIXED_POINT_FACTOR = 10_000;
-
-function fixedPoint(msg: PhotonMessage, key: number): number | null {
-  const value = msg.params.get(key);
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && isIdTag(msg.types.get(key))
-    ? value / FIXED_POINT_FACTOR
-    : null;
-}
 
 export function readFameReward(msg: PhotonMessage) {
   if (msg.kind !== "event" || msg.code !== UPDATE_FAME_EVENT) return null;
