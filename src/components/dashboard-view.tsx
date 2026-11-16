@@ -19,7 +19,7 @@ const COMPACT_HIDE = ["buyMax", "sellMin", "capital", "confidence", "volume"];
 function MoreLink({ href }: { href: string }) {
   return (
     <Link href={href} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary">
-      Tümü <ArrowRight className="size-3" />
+      View all <ArrowRight className="size-3" />
     </Link>
   );
 }
@@ -35,8 +35,8 @@ export function DashboardView() {
   return (
     <div className="pb-4">
       <PageHeader section="dashboard"
-        title="Panel"
-        description={`${settings.homeCity} çıkışlı fırsatlar · ${settings.premium ? "Premium" : "Premium yok"} Sales Tax oranıyla · min. ROI %${Math.round(settings.minRoi * 100)} · maks. veri yaşı ${formatAge(settings.maxDataAgeMinutes)}`}
+        title="Dashboard"
+        description={`Opportunities from ${settings.homeCity} · ${settings.premium ? "Premium" : "non-Premium"} Sales Tax · min. ROI ${Math.round(settings.minRoi * 100)}% · max. data age ${formatAge(settings.maxDataAgeMinutes)}`}
         actions={<DataStatus meta={data?.meta} isFetching={query.isFetching} onRefresh={() => query.refetch()} />}
       />
 
@@ -44,43 +44,43 @@ export function DashboardView() {
         <KpiStrip
           items={[
             {
-              label: "Ticaret bütçesi",
+              label: "Trade budget",
               value: <Silver value={settings.tradeBudget} compact />,
               sub: (
                 <>
-                  Toplam {formatCompact(settings.totalSilver)} · dokunulmayan {formatCompact(Math.max(0, settings.totalSilver - settings.tradeBudget))}
+                  Total {formatCompact(settings.totalSilver)} · untouched {formatCompact(Math.max(0, settings.totalSilver - settings.tradeBudget))}
                 </>
               ),
             },
             {
-              label: "Filtrelenmiş fırsat",
+              label: "Filtered opportunities",
               value: <span className="num">{data ? data.summary.opportunityCount : "—"}</span>,
-              sub: data ? `${data.flips.total} flip · ${data.trades.total} şehirler arası` : "taranıyor…",
+              sub: data ? `${data.flips.total} flips · ${data.trades.total} cross-city` : "scanning…",
             },
             {
-              label: "En yüksek potansiyel net kâr",
-              tip: "Tek fırsat için önerilen adet × birim net kâr. Eski, anormal veya kârsız fırsatlar hariç. Garanti değildir.",
+              label: "Top potential net profit",
+              tip: "Suggested quantity × net profit per unit for a single opportunity. Stale, anomalous or unprofitable opportunities are excluded. Not guaranteed.",
               value: <ProfitValue value={data?.summary.topPotentialProfit ?? null} compact />,
-              sub: "önerilen adetle, tahmini",
+              sub: "at suggested quantity, estimated",
             },
             {
-              label: "Önerilen sepet",
-              tip: "Bütçe optimizer'ının çeşitlendirilmiş sepeti. Tüm ücretler sermayeye dahildir.",
+              label: "Suggested basket",
+              tip: "The Budget Optimizer's diversified basket. All fees are included in the capital.",
               value: <ProfitValue value={data?.basket.estimatedProfit ?? null} compact />,
               sub: data ? (
                 <>
-                  {formatCompact(data.basket.totalInvestment)} yatırım · {formatCompact(data.basket.unusedBudget)} kullanılmıyor
+                  {formatCompact(data.basket.totalInvestment)} invested · {formatCompact(data.basket.unusedBudget)} unused
                 </>
               ) : (
                 "—"
               ),
             },
             {
-              label: "Veri durumu",
+              label: "Data status",
               value: <span className="num">{data ? `${formatAge(fetchedAge)}` : "—"}</span>,
               sub: data
-                ? `${data.meta.prices.loaded}/${data.meta.prices.total} fiyat · ${data.meta.history.loaded}/${data.meta.history.total} hacim paketi`
-                : "yükleniyor",
+                ? `${data.meta.prices.loaded}/${data.meta.prices.total} price · ${data.meta.history.loaded}/${data.meta.history.total} volume batches`
+                : "loading",
             },
           ]}
         />
@@ -91,12 +91,12 @@ export function DashboardView() {
           </Panel>
         ) : (
           <>
-            <Panel title="Önerilen işlemler" actions={<MoreLink href="/optimizer" />}>
+            <Panel title="Suggested trades" actions={<MoreLink href="/optimizer" />}>
               {!data ? (
-                <TableSkeleton rows={4} note="Piyasa taranıyor…" />
+                <TableSkeleton rows={4} note="Scanning the market…" />
               ) : data.basket.lines.length === 0 ? (
-                <EmptyState title="Bütçeye uygun, güvenilir fırsat yok">
-                  Eski, anormal veya bütçeyi aşan fırsatlar sepete alınmaz. Filtreleri veya ayarları gevşetmeyi deneyin.
+                <EmptyState title="No reliable opportunity fits the budget">
+                  Stale, anomalous or over-budget opportunities are left out of the basket. Try loosening the filters or settings.
                 </EmptyState>
               ) : (
                 <BasketTable basket={{ ...data.basket, lines: data.basket.lines.slice(0, 6) }} compact />
@@ -108,7 +108,7 @@ export function DashboardView() {
                 {!data ? (
                   <TableSkeleton rows={6} />
                 ) : data.flips.items.length === 0 ? (
-                  <EmptyState title="Uygun flip fırsatı yok" />
+                  <EmptyState title="No flip opportunities" />
                 ) : (
                   <OpportunityTable
                     data={data.flips.items}
@@ -119,11 +119,11 @@ export function DashboardView() {
                   />
                 )}
               </Panel>
-              <Panel title={`Şehirler arası · ${settings.homeCity} çıkışlı`} actions={<MoreLink href="/trade" />}>
+              <Panel title={`Cross-City Trade · from ${settings.homeCity}`} actions={<MoreLink href="/trade" />}>
                 {!data ? (
                   <TableSkeleton rows={6} />
                 ) : data.trades.items.length === 0 ? (
-                  <EmptyState title="Uygun şehirler arası fırsat yok" />
+                  <EmptyState title="No cross-city opportunities" />
                 ) : (
                   <OpportunityTable
                     data={data.trades.items}

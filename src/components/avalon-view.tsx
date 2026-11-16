@@ -97,7 +97,7 @@ function ZoneCard({ zone }: { zone: AvalonZone }) {
           <Gem className="size-3.5" aria-hidden /> Chests <span className="num normal-case">({chestCount})</span>
         </h4>
         {zone.chests.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Chest noktası yok</p>
+          <p className="text-xs text-muted-foreground">No Chest spots</p>
         ) : (
           <div className="flex flex-wrap gap-1">
             {zone.chests.map((c) => (
@@ -114,7 +114,7 @@ function ZoneCard({ zone }: { zone: AvalonZone }) {
           <Skull className="size-3.5" aria-hidden /> Dungeons <span className="num normal-case">({dungeonCount})</span>
         </h4>
         {zone.dungeons.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Dungeon girişi yok</p>
+          <p className="text-xs text-muted-foreground">No Dungeon entrances</p>
         ) : (
           <div className="flex flex-wrap gap-1">
             {zone.dungeons.map((d) => (
@@ -131,13 +131,13 @@ function ZoneCard({ zone }: { zone: AvalonZone }) {
           <Trees className="size-3.5" aria-hidden /> Resources
         </h4>
         {resources.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Veri bulunamadı</p>
+          <p className="text-xs text-muted-foreground">No data</p>
         ) : (
           <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
             {resources.map((r) => (
               <li key={r.type} className="flex justify-between gap-2">
                 <span>{r.label}</span>
-                <span className="num text-muted-foreground">{r.nodes} node</span>
+                <span className="num text-muted-foreground">{r.nodes} {r.nodes === 1 ? "node" : "nodes"}</span>
               </li>
             ))}
           </ul>
@@ -169,7 +169,7 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
     <div className="pb-8">
       <PageHeader section="avalon"
         title="Roads of Avalon"
-        description="Zone adını yaz, içindeki Chest noktalarını, Dungeon girişlerini ve Resource Node sayılarını gör. Veriler oyunun statik harita dosyalarından üretilir; Albion Data API'ye istek atılmaz."
+        description="Type a Zone name to see its Chest spots, Dungeon entrances and Resource Node counts. Built from the game's static map files; no requests are sent to the Albion Data API."
       />
 
       <div className="space-y-3 px-3 lg:px-4">
@@ -177,14 +177,14 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
           <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
           <div className="space-y-1">
             <p>
-              <span className="font-medium text-foreground">Roads of Avalon, full-loot PvP bölgesidir.</span>{" "}
+              <span className="font-medium text-foreground">Roads of Avalon is a full-loot PvP area.</span>{" "}
               <span className="text-muted-foreground">
-                Profilin güvenli ticarete göre ayarlı; bu sayfa yalnızca bilgi amaçlıdır.
+                Your profile is set up for safe trading; this page is for information only.
               </span>
             </p>
             <p className="text-muted-foreground">
-              Gösterilenler Zone&apos;un sabit yapısıdır. Chest&apos;lerin canlı durumu ve <span className="text-foreground">Portal bağlantıları</span>
-              {" "}bu sayfada gösterilmez. Chest sayıları olası doğma noktalarıdır, o an açılabilir Chest olduğu anlamına gelmez.
+              This is the Zone&apos;s fixed layout. The live state of Chests and <span className="text-foreground">Portal connections</span>
+              {" "}are not shown here. Chest counts are possible spawn points, not Chests that can be opened right now.
             </p>
           </div>
         </div>
@@ -192,16 +192,16 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
         <Panel>
           <div className="flex flex-wrap items-end gap-x-4 gap-y-3 p-3">
             <label className="flex min-w-60 flex-1 flex-col gap-1">
-              <FieldLabel>Zone adı</FieldLabel>
+              <FieldLabel>Zone name</FieldLabel>
               <div className="relative">
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
                 <Input
                   autoFocus
                   value={filters.query}
                   onChange={(e) => update({ query: e.target.value })}
-                  placeholder="ör. Ouyos-Aoeuam"
+                  placeholder="e.g. Ouyos-Aoeuam"
                   className="h-8 pl-8 text-[13px]"
-                  aria-label="Zone adı ara"
+                  aria-label="Search Zone name"
                 />
               </div>
             </label>
@@ -223,14 +223,14 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
               />
             </div>
             <label className="flex flex-col gap-1">
-              <FieldLabel>Zone tipi</FieldLabel>
+              <FieldLabel>Zone type</FieldLabel>
               <NativeSelect
-                label="Zone tipi"
+                label="Zone type"
                 value={filters.types[0] ?? ""}
                 onChange={(v) => update({ types: v ? [v] : [] })}
                 className="w-44"
               >
-                <option value="">Tümü</option>
+                <option value="">All</option>
                 {typeOptions.map((t) => (
                   <option key={t} value={t}>
                     {ZONE_TYPE_LABELS[t] ?? t}
@@ -240,7 +240,7 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
             </label>
             {dirty && (
               <Button variant="ghost" size="sm" onClick={() => update(DEFAULT_AVALON_FILTERS)}>
-                <X /> Temizle
+                <X /> Clear
               </Button>
             )}
           </div>
@@ -251,16 +251,16 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
             <span className="num text-foreground">{results.length}</span> / <span className="num">{zones.length}</span> Zone
           </span>
           <span>
-            Kaynak: ao-bin-dumps oyun dosyaları · üretildi <span className="num">{generatedAt.slice(0, 10)}</span>
+            Source: ao-bin-dumps game files · generated <span className="num">{generatedAt.slice(0, 10)}</span>
           </span>
         </div>
 
         {results.length === 0 ? (
           <Panel>
-            <EmptyState title="Veri bulunamadı">
+            <EmptyState title="No data">
               {filters.query
-                ? `"${filters.query}" adında bir Roads of Avalon Zone'u yok. Adı oyundaki gibi yazdığından emin ol (büyük/küçük harf ve tire önemli değil).`
-                : "Filtrelere uyan Zone yok."}
+                ? `There is no Roads of Avalon Zone named "${filters.query}". Check that you typed it as in the game (case and hyphens do not matter).`
+                : "No Zones match the filters."}
             </EmptyState>
           </Panel>
         ) : (
@@ -273,7 +273,7 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
             {results.length > visible && (
               <div className="flex justify-center pt-1">
                 <Button variant="outline" size="sm" onClick={() => setVisible((v) => v + PAGE_SIZE)}>
-                  Daha fazla göster ({results.length - visible})
+                  Show more ({results.length - visible})
                 </Button>
               </div>
             )}
@@ -281,9 +281,9 @@ export function AvalonView({ zones, generatedAt }: { zones: AvalonZone[]; genera
         )}
 
         <p className="text-[11px] leading-relaxed text-muted-foreground/80">
-          {DUNGEON_KIND_LABELS.solo}, {DUNGEON_KIND_LABELS.group} ve {DUNGEON_KIND_LABELS.avalonian} girişleri
-          Zone&apos;un harita işaretleriyle karşılaştırılarak doğrulanmıştır. Resource Node sayıları oyunun dağıtım tablosundan gelir;
-          Node&apos;lar toplandıktan sonra yeniden doğana kadar boş olabilir.
+          {DUNGEON_KIND_LABELS.solo}, {DUNGEON_KIND_LABELS.group} and {DUNGEON_KIND_LABELS.avalonian} entrances
+          were verified against the Zone&apos;s map markers. Resource Node counts come from the game&apos;s distribution table;
+          Nodes may be empty after gathering until they respawn.
         </p>
       </div>
     </div>

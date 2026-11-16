@@ -22,30 +22,30 @@ export function OptimizerView() {
   return (
     <div className="pb-4">
       <PageHeader section="optimizer"
-        title="Bütçe Optimizer"
-        description={`Ticaret bütçesini (${formatPercent(settings.tradeBudget / Math.max(1, settings.totalSilver))} servet) skor sırasına göre çeşitlendirilmiş pozisyonlara dağıtır. Risk tercihi: ${RISK_PREFERENCE_LABELS[settings.riskPreference]}.`}
+        title="Budget Optimizer"
+        description={`Spreads the trade budget (${formatPercent(settings.tradeBudget / Math.max(1, settings.totalSilver))} of total silver) over diversified positions in score order. Risk preference: ${RISK_PREFERENCE_LABELS[settings.riskPreference]}.`}
         actions={<DataStatus meta={query.data?.meta} isFetching={query.isFetching} onRefresh={() => query.refetch()} />}
       />
       <div className="space-y-3 px-3 lg:px-4">
         <KpiStrip
           items={[
-            { label: "Ticaret bütçesi", value: <Silver value={settings.tradeBudget} compact /> },
+            { label: "Trade budget", value: <Silver value={settings.tradeBudget} compact /> },
             {
-              label: "Toplam yatırım",
+              label: "Total investment",
               value: <Silver value={basket?.totalInvestment ?? null} compact />,
-              sub: "tüm alış/satış ücretleri dahil",
+              sub: "all buy/sell fees included",
             },
             {
-              label: "Tahmini kâr",
-              tip: "Tüm Order'ların önerilen fiyatlardan dolması halinde. Garanti değildir; günlük kazanç tahmini değildir.",
+              label: "Estimated profit",
+              tip: "If every order fills at the suggested prices. Not guaranteed, and not a daily earnings estimate.",
               value: <ProfitValue value={basket?.estimatedProfit ?? null} compact />,
-              sub: basket && basket.totalInvestment > 0 ? `${formatPercent(basket.estimatedProfit / basket.totalInvestment)} sepet ROI` : undefined,
+              sub: basket && basket.totalInvestment > 0 ? `${formatPercent(basket.estimatedProfit / basket.totalInvestment)} basket ROI` : undefined,
             },
-            { label: "Kullanılmayan bütçe", value: <Silver value={basket?.unusedBudget ?? null} compact /> },
+            { label: "Unused budget", value: <Silver value={basket?.unusedBudget ?? null} compact /> },
             {
-              label: "Dokunulmayan sermaye",
+              label: "Untouched capital",
               value: <Silver value={basket?.reservedCapital ?? Math.max(0, settings.totalSilver - settings.tradeBudget)} compact />,
-              sub: "toplam servet − ticaret bütçesi",
+              sub: "total silver − trade budget",
             },
           ]}
         />
@@ -55,30 +55,30 @@ export function OptimizerView() {
           {query.isError && !query.data ? (
             <ErrorState error={query.error} onRetry={() => query.refetch()} />
           ) : !basket ? (
-            <TableSkeleton rows={6} note="Piyasa taranıyor…" />
+            <TableSkeleton rows={6} note="Scanning the market…" />
           ) : basket.lines.length === 0 ? (
-            <EmptyState title="Sepete alınabilecek güvenilir fırsat yok">
-              Eski veri, anomali veya aşırı ROI işaretli fırsatlar ve bütçeyi aşan item&apos;lar sepete alınmaz.
+            <EmptyState title="No reliable opportunities for the basket">
+              Opportunities flagged as stale, anomalous or extreme ROI, and items over budget, are left out of the basket.
             </EmptyState>
           ) : (
             <BasketTable basket={basket} />
           )}
         </Panel>
 
-        <Panel title="Algoritma kuralları">
+        <Panel title="Algorithm rules">
           <ul className="list-disc space-y-1 py-3 pr-3 pl-7 text-xs text-muted-foreground">
-            <li>Her item için tek pozisyon (en yüksek skorlu Quality/rota); en fazla 12 pozisyon.</li>
+            <li>One position per item (the highest-scoring Quality/route); at most 12 positions.</li>
             <li>
-              Pozisyon başına bütçe tavanı: düşük risk {formatPercent(params.maxBudgetShare.low)}, orta {formatPercent(params.maxBudgetShare.medium)}, yüksek{" "}
-              {formatPercent(params.maxBudgetShare.high)}, hacim verisi yok {formatPercent(params.unknownVolumeShare)}.
+              Budget cap per position: low risk {formatPercent(params.maxBudgetShare.low)}, medium {formatPercent(params.maxBudgetShare.medium)}, high{" "}
+              {formatPercent(params.maxBudgetShare.high)}, no volume data {formatPercent(params.unknownVolumeShare)}.
             </li>
             <li>
-              Adet, gözlemlenen günlük hacmin {formatPercent(params.volumeShare)}&apos;i × {params.maxHoldDays} gün ile sınırlanır (Order tarafları arasında
-              bölünür). Instant Buy/Instant Sell işlemlerinde Order Book derinliği (fiyatın %3 yakınındaki miktar) kontrol edilir
-              {query.data && !query.data.orderbookChecked && " — bu taramada Instant Buy/Instant Sell adayı olmadığı için kullanılmadı"}.
+              Quantity is capped at {formatPercent(params.volumeShare)} of observed daily volume × {params.maxHoldDays} days (split between the order
+              sides). For Instant Buy/Instant Sell trades the Order Book depth (quantity within 3% of the price) is checked
+              {query.data && !query.data.orderbookChecked && " — not used in this scan because there were no Instant Buy/Instant Sell candidates"}.
             </li>
-            <li>Eski veri, fiyat anomalisi ve %150 üzeri ROI işaretli fırsatlar sepete alınmaz.</li>
-            <li>Sepet, item&apos;ların gerçekten alınabileceğini veya satılabileceğini garanti etmez.</li>
+            <li>Opportunities flagged as stale, price outliers or above 150% ROI are left out of the basket.</li>
+            <li>The basket does not guarantee that the items can actually be bought or sold.</li>
           </ul>
         </Panel>
         <Disclaimer />

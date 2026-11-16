@@ -22,7 +22,7 @@ export const DEFAULT_FEES: FeeConfig = {
 };
 
 export const FEE_ASSUMPTION_NOTE =
-  "Varsayım: Setup Fee %2.5 (Buy Order ve Sell Order, iade edilmez), Sales Tax Premium %4 / Premium yok %8. Instant Buy'da ücret yok, Instant Sell'de yalnız Sales Tax. Resmi kaynaktan doğrulanamadı — oyun içi market ekranından kontrol edin.";
+  "Assumption: Setup Fee 2.5% (Buy Order and Sell Order, non-refundable), Sales Tax 4% with Premium / 8% without. Instant Buy has no fee, Instant Sell pays only Sales Tax. Not verified against an official source — check the in-game market screen.";
 
 export function salesTaxRate(fees: FeeConfig, premium: boolean): number {
   return premium ? fees.salesTaxRatePremium : fees.salesTaxRateNonPremium;

@@ -9,10 +9,10 @@ import { formatSilver } from "@/lib/format";
 import type { Basket, BasketLine } from "@/lib/optimizer/budget";
 
 const LIMIT_LABELS: Record<BasketLine["limitedBy"][number], string> = {
-  budget_share: "Risk bazlı bütçe payı",
-  remaining_budget: "Kalan bütçe",
-  liquidity: "Likidite (hacim)",
-  orderbook_depth: "Order Book derinliği",
+  budget_share: "Risk-based budget share",
+  remaining_budget: "Remaining budget",
+  liquidity: "Liquidity (volume)",
+  orderbook_depth: "Order Book depth",
 };
 
 export function BasketTable({ basket, compact }: { basket: Basket; compact?: boolean }) {
@@ -22,15 +22,15 @@ export function BasketTable({ basket, compact }: { basket: Basket; compact?: boo
         <thead className="bg-surface">
           <tr className="border-b border-border text-[11px] tracking-wide text-muted-foreground uppercase">
             <th className="h-8 px-2 text-left font-medium">Item</th>
-            <th className="px-2 text-left font-medium">İşlem</th>
-            <th className="px-2 text-right font-medium">Adet</th>
-            {!compact && <th className="px-2 text-right font-medium">Alış</th>}
-            {!compact && <th className="px-2 text-right font-medium">Satış</th>}
-            <th className="px-2 text-right font-medium">Sermaye</th>
-            <th className="px-2 text-right font-medium">Tahmini kâr</th>
+            <th className="px-2 text-left font-medium">Trade</th>
+            <th className="px-2 text-right font-medium">Qty</th>
+            {!compact && <th className="px-2 text-right font-medium">Buy</th>}
+            {!compact && <th className="px-2 text-right font-medium">Sell</th>}
+            <th className="px-2 text-right font-medium">Capital</th>
+            <th className="px-2 text-right font-medium">Est. profit</th>
             <th className="px-2 text-right font-medium">ROI</th>
             <th className="px-2 text-left font-medium">Risk</th>
-            {!compact && <th className="px-2 text-left font-medium">Sınırlayan</th>}
+            {!compact && <th className="px-2 text-left font-medium">Limited by</th>}
           </tr>
         </thead>
         <tbody>
@@ -89,7 +89,7 @@ export function BasketTable({ basket, compact }: { basket: Basket; compact?: boo
                 </td>
                 {!compact && (
                   <td className="px-2 text-xs text-muted-foreground">
-                    <WithTip tip="Adedi belirleyen kısıt. Birden fazla kısıt aynı adette kesişebilir.">
+                    <WithTip tip="The constraint that set the quantity. Several constraints can meet at the same quantity.">
                       {line.limitedBy.map((l) => LIMIT_LABELS[l]).join(", ")}
                     </WithTip>
                   </td>

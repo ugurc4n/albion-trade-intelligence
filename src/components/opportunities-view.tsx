@@ -13,12 +13,12 @@ const COPY = {
   flip: {
     title: "Market Flipping",
     description:
-      "Aynı şehirde Buy Order (en yüksek Buy Order'ın 1 silver üstü) verip Sell Order (en düşük Sell Order'ın 1 silver altı) ile satma fırsatları. Görünen fark kesin kazanç değildir; Order'lar dolmayabilir veya fiyatlar değişebilir.",
+      "Place a Buy Order (1 silver above the highest Buy Order) and resell with a Sell Order (1 silver below the lowest Sell Order) in the same city. The spread shown is not guaranteed profit; orders may not fill and prices may move.",
   },
   trade: {
-    title: "Şehirler Arası Ticaret",
+    title: "Cross-City Trade",
     description:
-      "Royal Cities (Martlock, Lymhurst, Bridgewatch, Fort Sterling, Thetford) arasında güvenli rotalar. Caerleon ve Brecilien hariç. Instant Buy/Instant Sell ile Buy Order/Sell Order fiyatları ayrı senaryolar olarak hesaplanır.",
+      "Safe routes between the Royal Cities (Martlock, Lymhurst, Bridgewatch, Fort Sterling, Thetford), excluding Caerleon and Brecilien. Instant Buy/Instant Sell and Buy Order/Sell Order prices are calculated as separate scenarios.",
   },
 } as const;
 
@@ -41,20 +41,20 @@ export function OpportunitiesView({ variant }: { variant: "flip" | "trade" }) {
         {query.isError && !query.data ? (
           <ErrorState error={query.error} onRetry={() => query.refetch()} />
         ) : !list ? (
-          <TableSkeleton note="Piyasa verisi taranıyor. İlk yüklemede ~70 toplu istek yapılır; sonraki istekler 5 dk önbellekten gelir." />
+          <TableSkeleton note="Scanning market data. The first load makes ~70 batched requests; later requests come from a 5-minute cache." />
         ) : list.items.length === 0 ? (
-          <EmptyState title="Filtrelere uyan fırsat bulunamadı">
-            Min. ROI ({Math.round((filters?.minRoi ?? settings.minRoi) * 100)}%), veri yaşı sınırı veya şehir filtresini gevşetmeyi deneyin. Eski veya
-            belirsiz fiyatlar bilinçli olarak gizlenir.
+          <EmptyState title="No opportunities match the filters">
+            Try loosening the min. ROI ({Math.round((filters?.minRoi ?? settings.minRoi) * 100)}%), the data-age limit or the city filter. Stale or
+            uncertain prices are hidden on purpose.
           </EmptyState>
         ) : (
           <>
             <div className="flex items-center justify-between border-b border-border px-3 py-1.5 text-xs text-muted-foreground">
               <span>
-                <span className="num text-foreground">{list.total}</span> fırsat
-                {list.total > list.items.length && ` (ilk ${list.items.length} gösteriliyor)`} · skora göre sıralı · ayrıntı için satıra tıklayın
+                <span className="num text-foreground">{list.total}</span> opportunities
+                {list.total > list.items.length && ` (showing first ${list.items.length})`} · sorted by score · click a row for details
               </span>
-              {query.isFetching && <span>güncelleniyor…</span>}
+              {query.isFetching && <span>updating…</span>}
             </div>
             <OpportunityTable data={list.items} variant={variant} maxDataAge={maxAge} />
           </>

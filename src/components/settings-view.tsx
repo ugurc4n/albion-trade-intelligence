@@ -49,7 +49,7 @@ function NumInput({
         value={text}
         onChange={(e) => {
           setText(e.target.value);
-          const t = e.target.value.trim().replace(/\./g, "").replace(",", ".");
+          const t = e.target.value.trim().replace(/,/g, "");
           if (t === "" && allowEmpty) return onChange(null);
           const n = Number(t);
           if (t !== "" && Number.isFinite(n)) onChange(n / scale);
@@ -63,7 +63,7 @@ function NumInput({
 
 export function SettingsView() {
   const { settings, hydrated, update, reset } = useSettings();
-  if (!hydrated) return <PageHeader section="settings" title="Ayarlar" description="Yükleniyor…" />;
+  if (!hydrated) return <PageHeader section="settings" title="Settings" description="Loading…" />;
   // Re-mount the form when stored settings change (e.g. after reset) so the draft starts from them.
   return <SettingsForm key={JSON.stringify(settings)} initial={settings} onSave={update} onReset={reset} />;
 }
@@ -80,18 +80,18 @@ function SettingsForm({ initial, onSave, onReset }: { initial: Settings; onSave:
   const parsed = settingsSchema.safeParse(draft);
   const errors: string[] = [];
   if (!parsed.success) errors.push(...parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`));
-  if (draft.tradeBudget > draft.totalSilver) errors.push("Ticaret bütçesi toplam silver'dan büyük olamaz.");
+  if (draft.tradeBudget > draft.totalSilver) errors.push("The trade budget cannot be larger than total silver.");
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
 
   return (
     <div className="pb-6">
       <PageHeader section="settings"
-        title="Ayarlar"
-        description="Ayarlar yalnızca bu tarayıcıda (localStorage) saklanır. Hesaplamalar bu değerlerle sunucuda yapılır."
+        title="Settings"
+        description="Settings are stored only in this browser (localStorage). Calculations run on the server with these values."
         actions={
           <>
             <Button variant="ghost" size="sm" onClick={onReset}>
-              <RotateCcw /> Varsayılanlar
+              <RotateCcw /> Defaults
             </Button>
             <Button
               size="sm"
@@ -103,7 +103,7 @@ function SettingsForm({ initial, onSave, onReset }: { initial: Settings; onSave:
                 }
               }}
             >
-              <Check /> Kaydet
+              <Check /> Save
             </Button>
           </>
         }
@@ -116,11 +116,11 @@ function SettingsForm({ initial, onSave, onReset }: { initial: Settings; onSave:
             ))}
           </div>
         )}
-        {saved && !dirty && <div className="text-xs text-profit">Kaydedildi.</div>}
+        {saved && !dirty && <div className="text-xs text-profit">Saved.</div>}
 
-        <Panel title="Profil">
-          <Row label="Sunucu">
-            <NativeSelect label="Sunucu" value={draft.server} onChange={(v) => set({ server: v as ServerId })}>
+        <Panel title="Profile">
+          <Row label="Server">
+            <NativeSelect label="Server" value={draft.server} onChange={(v) => set({ server: v as ServerId })}>
               {SERVER_IDS.map((s) => (
                 <option key={s} value={s}>
                   {SERVERS[s].label}
@@ -128,8 +128,8 @@ function SettingsForm({ initial, onSave, onReset }: { initial: Settings; onSave:
               ))}
             </NativeSelect>
           </Row>
-          <Row label="Ana şehir" hint="Panel ve tablolarda varsayılan alış şehri.">
-            <NativeSelect label="Ana şehir" value={draft.homeCity} onChange={(v) => set({ homeCity: v as City })}>
+          <Row label="Home city" hint="Default buy city on the Dashboard and in tables.">
+            <NativeSelect label="Home city" value={draft.homeCity} onChange={(v) => set({ homeCity: v as City })}>
               {ROYAL_CITIES.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -137,24 +137,24 @@ function SettingsForm({ initial, onSave, onReset }: { initial: Settings; onSave:
               ))}
             </NativeSelect>
           </Row>
-          <Row label="Premium" hint="Sales Tax oranını belirler.">
+          <Row label="Premium" hint="Sets the Sales Tax rate.">
             <Switch checked={draft.premium} onCheckedChange={(v) => set({ premium: v })} />
-            <span className="text-xs text-muted-foreground">{draft.premium ? "Premium aktif" : "Premium yok"}</span>
+            <span className="text-xs text-muted-foreground">{draft.premium ? "Premium active" : "No Premium"}</span>
           </Row>
         </Panel>
 
-        <Panel title="Sermaye">
-          <Row label="Toplam silver">
+        <Panel title="Capital">
+          <Row label="Total silver">
             <NumInput value={draft.totalSilver} onChange={(v) => set({ totalSilver: Math.round(v ?? 0) })} />
             <span className="num text-xs text-muted-foreground">{formatCompact(draft.totalSilver)}</span>
           </Row>
-          <Row label="Ticaret bütçesi" hint="Optimizer yalnızca bu tutarı kullanır.">
+          <Row label="Trade budget" hint="The Budget Optimizer only uses this amount.">
             <NumInput value={draft.tradeBudget} onChange={(v) => set({ tradeBudget: Math.round(v ?? 0) })} />
             <span className="num text-xs text-muted-foreground">
-              {formatCompact(draft.tradeBudget)} · dokunulmayan {formatCompact(Math.max(0, draft.totalSilver - draft.tradeBudget))}
+              {formatCompact(draft.tradeBudget)} · untouched {formatCompact(Math.max(0, draft.totalSilver - draft.tradeBudget))}
             </span>
           </Row>
-          <Row label="Risk tercihi" hint="Pozisyon büyüklüğü ve hacim payı varsayımlarını belirler.">
+          <Row label="Risk preference" hint="Sets the position size and volume share assumptions.">
             {RISK_PREFERENCES.map((r: RiskPreference) => (
               <button
                 key={r}
@@ -172,24 +172,24 @@ function SettingsForm({ initial, onSave, onReset }: { initial: Settings; onSave:
           </Row>
         </Panel>
 
-        <Panel title="Fırsat eşikleri">
+        <Panel title="Opportunity thresholds">
           <Row label="Minimum ROI">
             <NumInput value={draft.minRoi} scale={100} suffix="%" width="w-28" onChange={(v) => set({ minRoi: v ?? 0 })} />
           </Row>
-          <Row label="Veri güncelliği sınırı" hint="Bundan eski fiyatlar güncel fırsat sayılmaz.">
-            <NumInput value={draft.maxDataAgeMinutes} suffix="dk" width="w-28" onChange={(v) => set({ maxDataAgeMinutes: Math.round(v ?? 0) })} />
+          <Row label="Data age limit" hint="Prices older than this are not counted as current opportunities.">
+            <NumInput value={draft.maxDataAgeMinutes} suffix="min" width="w-28" onChange={(v) => set({ maxDataAgeMinutes: Math.round(v ?? 0) })} />
           </Row>
         </Panel>
 
-        <Panel title="Sales Tax ve Setup Fee varsayımları">
+        <Panel title="Sales Tax and Setup Fee assumptions">
           <p className="border-b border-border/60 px-3 py-2 text-[11px] leading-relaxed text-warn">{FEE_ASSUMPTION_NOTE}</p>
-          <Row label="Setup Fee" hint={`Varsayılan %${DEFAULT_FEES.setupFeeRate * 100}`}>
+          <Row label="Setup Fee" hint={`Default ${DEFAULT_FEES.setupFeeRate * 100}%`}>
             <NumInput value={draft.fees.setupFeeRate} scale={100} suffix="%" width="w-28" onChange={(v) => setFees({ setupFeeRate: v ?? 0 })} />
           </Row>
-          <Row label="Sales Tax (Premium)" hint={`Varsayılan %${DEFAULT_FEES.salesTaxRatePremium * 100}`}>
+          <Row label="Sales Tax (Premium)" hint={`Default ${DEFAULT_FEES.salesTaxRatePremium * 100}%`}>
             <NumInput value={draft.fees.salesTaxRatePremium} scale={100} suffix="%" width="w-28" onChange={(v) => setFees({ salesTaxRatePremium: v ?? 0 })} />
           </Row>
-          <Row label="Sales Tax (Premium yok)" hint={`Varsayılan %${DEFAULT_FEES.salesTaxRateNonPremium * 100}`}>
+          <Row label="Sales Tax (no Premium)" hint={`Default ${DEFAULT_FEES.salesTaxRateNonPremium * 100}%`}>
             <NumInput
               value={draft.fees.salesTaxRateNonPremium}
               scale={100}
@@ -198,16 +198,16 @@ function SettingsForm({ initial, onSave, onReset }: { initial: Settings; onSave:
               onChange={(v) => setFees({ salesTaxRateNonPremium: v ?? 0 })}
             />
           </Row>
-          <Row label="Beklenen yeniden listeleme" hint="Sell Order başına; her biri Setup Fee'yi yeniden öder.">
+          <Row label="Expected relists" hint="Per Sell Order; each one pays the Setup Fee again.">
             <NumInput value={draft.fees.expectedRelists} width="w-28" onChange={(v) => setFees({ expectedRelists: v ?? 0 })} />
           </Row>
         </Panel>
 
-        <Panel title="Taşıma (opsiyonel)">
-          <Row label="Taşıma maliyeti" hint="Şehirler arası ticarette kg başına silver. API'de yok; kendi tahmininiz.">
+        <Panel title="Transport (optional)">
+          <Row label="Transport cost" hint="Silver per kg for cross-city trades. Not in the API; your own estimate.">
             <NumInput value={draft.transportCostPerKg} suffix="/kg" width="w-28" onChange={(v) => set({ transportCostPerKg: v ?? 0 })} />
           </Row>
-          <Row label="Taşıma kapasitesi" hint="Sefer başına kg. Boş = sınırsız.">
+          <Row label="Carry capacity" hint="kg per trip. Empty = unlimited.">
             <NumInput value={draft.carryCapacityKg} suffix="kg" width="w-28" allowEmpty onChange={(v) => set({ carryCapacityKg: v })} />
           </Row>
         </Panel>

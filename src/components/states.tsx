@@ -40,20 +40,20 @@ function useCountdown(target?: number) {
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const apiErr = error instanceof ClientApiError ? error : null;
   const seconds = useCountdown(apiErr?.retryAt);
-  const message = error instanceof Error ? error.message : "Bilinmeyen hata";
+  const message = error instanceof Error ? error.message : "Unknown error";
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center" role="alert">
       <AlertTriangle className="size-6 text-loss" aria-hidden />
-      <p className="text-sm font-medium">Piyasa verisi alınamadı</p>
+      <p className="text-sm font-medium">Could not load market data</p>
       <p className="max-w-md text-xs text-muted-foreground">{message}</p>
       {apiErr?.kind === "rate_limited" && seconds !== null && (
         <p className="num text-xs text-warn">
-          {seconds > 0 ? `API limiti: ${seconds} sn sonra tekrar denenebilir.` : "Tekrar denenebilir."}
+          {seconds > 0 ? `API rate limit: retry in ${seconds}s.` : "You can retry now."}
         </p>
       )}
       {onRetry && (
         <Button size="sm" variant="outline" onClick={onRetry} disabled={!!seconds} className="mt-1">
-          <RefreshCw /> Tekrar dene
+          <RefreshCw /> Retry
         </Button>
       )}
     </div>

@@ -76,7 +76,7 @@ export function DataStatus({
   if (!meta) {
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Loader2 className="size-3.5 animate-spin" /> Piyasa taranıyor… (ilk yükleme ~5–15 sn)
+        <Loader2 className="size-3.5 animate-spin" /> Scanning the market… (first load ~5–15 s)
       </div>
     );
   }
@@ -85,39 +85,39 @@ export function DataStatus({
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       <WithTip
-        tip={`Fiyatlar sunucu tarafında ${formatAge(fetchedAge)} önce Albion Data API'den çekildi ve 5 dk önbellekte tutulur. Bu, oyuncuların emri gördüğü zaman değildir — her satırdaki "Veri yaşı" sütununa bakın.`}
+        tip={`Prices were fetched from the Albion Data API ${formatAge(fetchedAge)} ago and are cached for 5 min. This is not when players saw the order — see the "Data age" column on each row.`}
       >
         <span className="inline-flex items-center gap-1.5">
           <span className={cn("size-1.5 rounded-full", partial ? "bg-warn" : "bg-profit")} aria-hidden />
-          Çekildi: <span className="num text-foreground">{formatAge(fetchedAge)}</span> önce
+          Fetched <span className="num text-foreground">{formatAge(fetchedAge)}</span> ago
         </span>
       </WithTip>
       <span>
-        Fiyat paketleri{" "}
+        Price batches{" "}
         <span className="num text-foreground">
           {meta.prices.loaded}/{meta.prices.total}
         </span>
       </span>
       <span>
-        Hacim paketleri{" "}
+        Volume batches{" "}
         <span className="num text-foreground">
           {meta.history.loaded}/{meta.history.total}
         </span>
       </span>
       <span>
-        <span className="num text-foreground">{formatSilver(meta.universeSize)}</span> item ·{" "}
-        <span className="num text-foreground">{formatSilver(meta.quoteCount)}</span> fiyat noktası
+        <span className="num text-foreground">{formatSilver(meta.universeSize)}</span> items ·{" "}
+        <span className="num text-foreground">{formatSilver(meta.quoteCount)}</span> price points
       </span>
       {meta.errors.length > 0 && (
         <WithTip tip={meta.errors.join(" · ")}>
           <span className="inline-flex items-center gap-1 text-warn">
-            <AlertTriangle className="size-3.5" /> {meta.errors.length} uyarı
+            <AlertTriangle className="size-3.5" /> {meta.errors.length} {meta.errors.length === 1 ? "warning" : "warnings"}
           </span>
         </WithTip>
       )}
       {onRefresh && (
         <Button variant="ghost" size="xs" onClick={onRefresh} disabled={isFetching} className="text-muted-foreground">
-          <RefreshCw className={cn(isFetching && "animate-spin")} /> Yenile
+          <RefreshCw className={cn(isFetching && "animate-spin")} /> Refresh
         </Button>
       )}
     </div>
@@ -147,8 +147,8 @@ export function KpiStrip({ items }: { items: { label: string; value: ReactNode; 
 export function Disclaimer({ className }: { className?: string }) {
   return (
     <p className={cn("text-[11px] leading-relaxed text-muted-foreground/80", className)}>
-      Gösterilen kârlar tahminidir: fiyatlar oyuncu istemcilerinden toplanır, gecikmeli veya eksik olabilir; Order&apos;ların dolacağı garanti
-      edilmez. Sales Tax ve Setup Fee ayarlardaki varsayımlarla hesaplanır.
+      Profits shown are estimates: prices are collected from player clients and may be delayed or incomplete, and orders are not
+      guaranteed to fill. Sales Tax and Setup Fee use the assumptions from Settings.
     </p>
   );
 }

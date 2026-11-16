@@ -7,7 +7,7 @@ export type ApiErrorBody = { error: { kind: string; message: string; retryAt?: n
 export function errorResponse(err: unknown): Response {
   if (err instanceof ZodError) {
     return Response.json(
-      { error: { kind: "bad_request", message: "Geçersiz istek parametreleri.", issues: err.issues.slice(0, 5) } },
+      { error: { kind: "bad_request", message: "Invalid request parameters.", issues: err.issues.slice(0, 5) } },
       { status: 400 },
     );
   }
@@ -20,7 +20,7 @@ export function errorResponse(err: unknown): Response {
   }
   console.error("[api] unexpected error", err);
   return Response.json(
-    { error: { kind: "internal", message: "Beklenmeyen bir sunucu hatası oluştu." } } satisfies ApiErrorBody,
+    { error: { kind: "internal", message: "An unexpected server error occurred." } } satisfies ApiErrorBody,
     { status: 500 },
   );
 }

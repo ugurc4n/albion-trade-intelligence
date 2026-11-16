@@ -12,12 +12,12 @@ const numeric = IBM_Plex_Mono({ variable: "--ff-num", weight: ["400", "500"], su
 
 export const metadata: Metadata = {
   title: "Albion Trade Intelligence",
-  description: "Albion Online gerçek piyasa verileriyle market flipping ve şehirler arası ticaret karar destek paneli.",
+  description: "Market flipping and cross-city trade decisions for Albion Online, backed by live market data.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="tr" className={`dark ${body.variable} ${display.variable} ${numeric.variable} h-full antialiased`}>
+    <html lang="en" className={`dark ${body.variable} ${display.variable} ${numeric.variable} h-full antialiased`}>
       <body className="min-h-full">
         <Providers>
           <AppShell>{children}</AppShell>

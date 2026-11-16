@@ -10,8 +10,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Product language
 
-Keep general interface text and explanations in Turkish. Keep Albion Online terminology in English,
-including item names, item categories, Quality and its values, Enchantment, resources, Roads of Avalon,
-Chest sizes/classes, Dungeons, factions, zone types, Damage/Healing stats, and market terms such as
-Buy Order, Sell Order, Setup Fee, and Sales Tax. Do not translate these terms in labels or Turkish prose.
-Display item names from `nameEn`; Turkish catalog names may remain as search aliases.
+The whole interface is in English: labels, explanations, error messages, the desktop app shell and the
+capture tool's console output. Use Albion Online's own English terminology (item names, Quality values,
+Enchantment, Chests, Dungeons, Buy Order, Sell Order, Setup Fee, Sales Tax, ...) exactly as the game does.
+Format numbers with `en-US` and dates with `en-GB`. Display item names from `nameEn`; Turkish catalog names
+may remain as search aliases.

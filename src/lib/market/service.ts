@@ -102,12 +102,12 @@ export async function getMarketSnapshot(server: ServerId): Promise<MarketSnapsho
   const history = chunkStatus(historyResults);
   const errors = [...new Set([...priceResults, ...historyResults].flatMap((r) => (r.status === "rejected" ? [errorMessage(r.reason)] : [])))];
   for (const r of [...priceResults, ...historyResults]) {
-    if (r.status === "fulfilled" && r.value.refreshError) errors.push(`Yenileme hatası (eski veri gösteriliyor): ${r.value.refreshError}`);
+    if (r.status === "fulfilled" && r.value.refreshError) errors.push(`Refresh failed (showing older data): ${r.value.refreshError}`);
   }
 
   if (prices.loaded === 0) {
     const first = priceResults.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
-    throw first?.reason ?? new Error("Fiyat verisi alınamadı.");
+    throw first?.reason ?? new Error("Could not load price data.");
   }
 
   const meta: SnapshotMeta = {

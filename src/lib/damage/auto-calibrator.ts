@@ -28,7 +28,7 @@ const ruleKey = (r: IdentityRule) => `${r.signature}|${r.nameKey}|${r.idKey}`;
 export class AutoCalibrator {
   private buffer: PhotonMessage[] = [];
   private lastRunAt: number | null = null;
-  status: AutoCalibrationStatus = { state: "waiting", note: "Henüz analiz yapılmadı.", checkedAt: null };
+  status: AutoCalibrationStatus = { state: "waiting", note: "No analysis yet.", checkedAt: null };
 
   push(messages: readonly PhotonMessage[]) {
     if (messages.length === 0) return;
@@ -95,8 +95,8 @@ export class AutoCalibrator {
         checkedAt: now,
         note:
           result.health.length === 0
-            ? "Henüz oyuncu vuruşu görülmedi. Bölge değiştirip bir mob'a vurman yeterli."
-            : `Vuruşlar görüldü ama henüz yeterince net değil (${top.subjectMobRows} vuruş). Biraz daha savaş.`,
+            ? "No player hits seen yet. Change zones and hit a mob."
+            : `Hits seen but not clear enough yet (${top.subjectMobRows} hits). Keep fighting a little longer.`,
       };
       return null;
     }
@@ -106,7 +106,7 @@ export class AutoCalibrator {
       this.status = {
         state: "stale",
         checkedAt: now,
-        note: "Kayıtlı kalibrasyon son savaşta vuruş eşleştirmedi. Sayılar yanlışsa Sıfırla'ya bas; otomatik olarak yeniden bulunur.",
+        note: "The saved calibration did not match any hits in the last fight. If the numbers look wrong, click Reset; it will be found again automatically.",
       };
       return null;
     }

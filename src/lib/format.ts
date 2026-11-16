@@ -1,6 +1,6 @@
-const intFmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
-const pctFmt = new Intl.NumberFormat("tr-TR", { style: "percent", maximumFractionDigits: 1, minimumFractionDigits: 1 });
-const decFmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 });
+const intFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const pctFmt = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 1, minimumFractionDigits: 1 });
+const decFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 
 export function formatSilver(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
@@ -8,12 +8,12 @@ export function formatSilver(value: number | null | undefined): string {
   return intFmt.format(Math.round(value) || 0);
 }
 
-/** 1.250.000 → "1,25M", 85.400 → "85,4K" */
+/** 1,250,000 → "1.25M", 85,400 → "85.4K" */
 export function formatCompact(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
   const abs = Math.abs(value);
   if (abs >= 1_000_000_000) return `${decFmt.format(value / 1_000_000_000)}B`;
-  if (abs >= 1_000_000) return `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(value / 1_000_000)}M`;
+  if (abs >= 1_000_000) return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value / 1_000_000)}M`;
   if (abs >= 10_000) return `${decFmt.format(value / 1_000)}K`;
   return intFmt.format(Math.round(value));
 }
@@ -30,11 +30,11 @@ export function formatDecimal(value: number | null | undefined): string {
 
 export function formatAge(minutes: number | null | undefined): string {
   if (minutes === null || minutes === undefined || !Number.isFinite(minutes)) return "—";
-  if (minutes < 1) return "<1 dk";
-  if (minutes < 60) return `${Math.round(minutes)} dk`;
+  if (minutes < 1) return "<1 min";
+  if (minutes < 60) return `${Math.round(minutes)} min`;
   const hours = minutes / 60;
-  if (hours < 24) return `${Math.floor(hours)} sa${minutes % 60 >= 1 ? ` ${Math.round(minutes % 60)} dk` : ""}`;
-  return `${decFmt.format(hours / 24)} gün`;
+  if (hours < 24) return `${Math.floor(hours)} h${minutes % 60 >= 1 ? ` ${Math.round(minutes % 60)} min` : ""}`;
+  return `${decFmt.format(hours / 24)} d`;
 }
 
 /** Minutes between epochMs and now. `now` comes from useNow() in components (null before hydration). */
@@ -45,7 +45,7 @@ export function ageFrom(epochMs: number | null | undefined, now: number | null):
 
 export function formatDateTime(epochMs: number | null | undefined): string {
   if (!epochMs) return "—";
-  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(epochMs);
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "short", timeStyle: "short" }).format(epochMs);
 }
 
 /** Albion shorthand: T5 enchant 1 → "5.1" */

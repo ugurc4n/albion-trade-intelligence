@@ -105,7 +105,7 @@ function NumberField({
     setText(external);
   }
   const commit = () => {
-    const trimmed = text.trim().replace(/\./g, "").replace(",", ".");
+    const trimmed = text.trim().replace(/,/g, "");
     if (trimmed === "") return onCommit(null);
     const n = Number(trimmed);
     if (Number.isFinite(n)) onCommit(n / scale);
@@ -139,9 +139,9 @@ const CATEGORIES = ["crafting", "weapons", "armors", "head", "shoes", "offhands"
 }));
 const SCENARIOS = (Object.keys(SCENARIO_LABELS) as ScenarioId[]).map((value) => ({ value, label: SCENARIO_LABELS[value] }));
 const RISKS: { value: RiskLevel; label: string }[] = [
-  { value: "low", label: "Düşük" },
-  { value: "medium", label: "Orta" },
-  { value: "high", label: "Yüksek" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
 ];
 
 export function FiltersBar({
@@ -183,14 +183,14 @@ export function FiltersBar({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Item ara (isim / ID)"
+            placeholder="Search items (name / ID)"
             className="h-8 pl-8 text-[13px]"
           />
         </label>
 
         <label className="flex flex-col gap-1">
-          <FieldLabel>Sunucu</FieldLabel>
-          <NativeSelect label="Sunucu" value={settings.server} onChange={(v) => update({ server: v as ServerId })}>
+          <FieldLabel>Server</FieldLabel>
+          <NativeSelect label="Server" value={settings.server} onChange={(v) => update({ server: v as ServerId })}>
             {SERVER_IDS.map((s) => (
               <option key={s} value={s}>
                 {SERVERS[s].label}
@@ -200,13 +200,13 @@ export function FiltersBar({
         </label>
 
         <label className="flex flex-col gap-1">
-          <FieldLabel>{variant === "flip" ? "Şehir" : "Alış şehri"}</FieldLabel>
-          <NativeSelect label="Alış şehri" value={filters.buyCity} onChange={(v) => onChange({ buyCity: v as Filters["buyCity"] })}>
-            <option value="all">Tümü</option>
+          <FieldLabel>{variant === "flip" ? "City" : "Buy city"}</FieldLabel>
+          <NativeSelect label="Buy city" value={filters.buyCity} onChange={(v) => onChange({ buyCity: v as Filters["buyCity"] })}>
+            <option value="all">All</option>
             {ROYAL_CITIES.map((c) => (
               <option key={c} value={c}>
                 {c}
-                {c === settings.homeCity ? " (ana)" : ""}
+                {c === settings.homeCity ? " (home)" : ""}
               </option>
             ))}
           </NativeSelect>
@@ -214,9 +214,9 @@ export function FiltersBar({
 
         {variant !== "flip" && (
           <label className="flex flex-col gap-1">
-            <FieldLabel>Satış şehri</FieldLabel>
-            <NativeSelect label="Satış şehri" value={filters.sellCity} onChange={(v) => onChange({ sellCity: v as Filters["sellCity"] })}>
-              <option value="all">Tümü</option>
+            <FieldLabel>Sell city</FieldLabel>
+            <NativeSelect label="Sell city" value={filters.sellCity} onChange={(v) => onChange({ sellCity: v as Filters["sellCity"] })}>
+              <option value="all">All</option>
               {ROYAL_CITIES.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -235,7 +235,7 @@ export function FiltersBar({
 
         <div className="ml-auto flex items-center gap-2 self-end">
           <Button variant="outline" size="sm" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-            <SlidersHorizontal /> Filtreler{activeCount > 0 && <span className="num text-primary">({activeCount})</span>}
+            <SlidersHorizontal /> Filters{activeCount > 0 && <span className="num text-primary">({activeCount})</span>}
           </Button>
           <Button
             variant="ghost"
@@ -245,7 +245,7 @@ export function FiltersBar({
               onReset();
             }}
           >
-            <RotateCcw /> Sıfırla
+            <RotateCcw /> Reset
           </Button>
         </div>
       </div>
@@ -265,13 +265,13 @@ export function FiltersBar({
             <Chips label="Quality" options={QUALITIES} value={filters.qualities} onChange={(qualities) => onChange({ qualities })} />
           </div>
           <div className="flex flex-col gap-1 lg:col-span-3">
-            <FieldLabel>Kategori</FieldLabel>
-            <Chips label="Kategori" options={CATEGORIES} value={filters.categories} onChange={(categories) => onChange({ categories })} />
+            <FieldLabel>Category</FieldLabel>
+            <Chips label="Category" options={CATEGORIES} value={filters.categories} onChange={(categories) => onChange({ categories })} />
           </div>
           {variant !== "flip" && (
             <div className="flex flex-col gap-1 lg:col-span-2">
-              <FieldLabel>Senaryo</FieldLabel>
-              <Chips label="Senaryo" options={SCENARIOS} value={filters.scenarios} onChange={(scenarios) => onChange({ scenarios })} />
+              <FieldLabel>Scenario</FieldLabel>
+              <Chips label="Scenario" options={SCENARIOS} value={filters.scenarios} onChange={(scenarios) => onChange({ scenarios })} />
             </div>
           )}
           <div className="flex flex-col gap-1">
@@ -287,11 +287,11 @@ export function FiltersBar({
               placeholder={String(Math.round(settings.minRoi * 100))}
               onCommit={(v) => onChange({ minRoi: v })}
             />
-            <NumberField label="Min. net kâr/adet" value={filters.minProfit} placeholder="—" onCommit={(v) => onChange({ minProfit: v })} />
-            <NumberField label="Maks. yatırım" value={filters.maxInvestment} placeholder="—" onCommit={(v) => onChange({ maxInvestment: v })} />
+            <NumberField label="Min. net profit/unit" value={filters.minProfit} placeholder="—" onCommit={(v) => onChange({ minProfit: v })} />
+            <NumberField label="Max. investment" value={filters.maxInvestment} placeholder="—" onCommit={(v) => onChange({ maxInvestment: v })} />
             <NumberField
-              label="Maks. veri yaşı"
-              suffix="dk"
+              label="Max. data age"
+              suffix="min"
               value={filters.maxDataAgeMinutes}
               placeholder={String(settings.maxDataAgeMinutes)}
               onCommit={(v) => onChange({ maxDataAgeMinutes: v === null ? null : Math.max(5, Math.round(v)) })}
@@ -299,13 +299,13 @@ export function FiltersBar({
             <div className="flex h-8 items-center gap-2">
               <Switch id="stale" checked={filters.includeStale} onCheckedChange={(v) => onChange({ includeStale: v })} />
               <label htmlFor="stale" className="text-xs">
-                Eski veriyi göster
+                Show stale data
               </label>
             </div>
             <div className="flex h-8 items-center gap-2">
               <Switch id="loss" checked={filters.includeUnprofitable} onCheckedChange={(v) => onChange({ includeUnprofitable: v })} />
               <label htmlFor="loss" className="text-xs">
-                Kârsızları göster
+                Show unprofitable
               </label>
             </div>
           </div>

@@ -250,16 +250,16 @@ export class DamageStateError extends Error {}
 export async function startSession(label: string): Promise<SessionRecord> {
   const svc = service();
   await svc.ready;
-  if (!svc.meter.getConfig() && !svc.meter.selfName) throw new DamageStateError("Damage kalibrasyonu veya kendi karakterinin tanınması bekleniyor; yakalayıcı açıkken bölge değiştir.");
-  if (svc.meter.snapshot()) throw new DamageStateError("Zaten çalışan bir oturum var.");
+  if (!svc.meter.getConfig() && !svc.meter.selfName) throw new DamageStateError("Waiting for damage calibration or for your character to be recognised; change zones while the capture is running.");
+  if (svc.meter.snapshot()) throw new DamageStateError("A session is already running.");
   const now = streamNow(svc, Date.now());
-  return svc.meter.startSession(newId(now), label.trim() || `Oturum ${new Date(now).toLocaleString("tr-TR")}`, now);
+  return svc.meter.startSession(newId(now), label.trim() || `Session ${new Date(now).toLocaleString("en-GB")}`, now);
 }
 
 export async function stopSession(): Promise<SessionRecord> {
   const svc = service();
   const done = svc.meter.stopSession(streamNow(svc, Date.now()));
-  if (!done) throw new DamageStateError("Çalışan oturum yok.");
+  if (!done) throw new DamageStateError("No session is running.");
   await saveSessionFile(done);
   return done;
 }
@@ -314,7 +314,7 @@ export async function deleteSession(id: string): Promise<boolean> {
 
 export function startRecording(): { id: string } {
   const svc = service();
-  if (svc.recording) throw new DamageStateError("Kayıt zaten sürüyor.");
+  if (svc.recording) throw new DamageStateError("A recording is already running.");
   const now = Date.now();
   svc.recording = { id: newId(now), startedAt: now, packets: [], truncated: false };
   return { id: svc.recording.id };
@@ -323,7 +323,7 @@ export function startRecording(): { id: string } {
 export async function stopRecording(): Promise<{ id: string; packets: number }> {
   const svc = service();
   const rec = svc.recording;
-  if (!rec) throw new DamageStateError("Süren bir kayıt yok.");
+  if (!rec) throw new DamageStateError("No recording is running.");
   svc.recording = null;
   svc.lastCapture = { id: rec.id, packets: rec.packets };
   await mkdir(CAPTURES_DIR, { recursive: true });
@@ -335,7 +335,7 @@ export async function stopRecording(): Promise<{ id: string; packets: number }> 
 export async function calibrate(names: string[]): Promise<CalibrationResult & { captureId: string; packets: number }> {
   const svc = service();
   const capture = svc.lastCapture;
-  if (!capture) throw new DamageStateError("Analiz için önce bir kayıt alın.");
+  if (!capture) throw new DamageStateError("Record a capture first to analyse it.");
   const decoder = new PhotonDecoder();
   const messages = capture.packets.flatMap((p) => {
     const b = Buffer.from(p.d, "base64");
@@ -358,7 +358,7 @@ export async function saveConfig(config: DamageConfig | null): Promise<void> {
 /** Desktop app: start the bundled capture (shows the Windows UAC prompt). `appBaseUrl` is this server's own address. */
 export function startCapture(appBaseUrl: string) {
   if (!launcher().available()) {
-    throw new DamageStateError("Başlat düğmesi yalnızca Windows masaüstü uygulamasında çalışır. Burada yakalayıcıyı elle çalıştır.");
+    throw new DamageStateError("The Start button only works in the Windows desktop app. Run the capture manually here.");
   }
   launcher().start(appBaseUrl, Date.now());
 }

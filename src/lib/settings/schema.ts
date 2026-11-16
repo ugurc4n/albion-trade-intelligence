@@ -6,9 +6,9 @@ export const RISK_PREFERENCES = ["conservative", "balanced", "aggressive"] as co
 export type RiskPreference = (typeof RISK_PREFERENCES)[number];
 
 export const RISK_PREFERENCE_LABELS: Record<RiskPreference, string> = {
-  conservative: "Temkinli",
-  balanced: "Dengeli",
-  aggressive: "Agresif",
+  conservative: "Conservative",
+  balanced: "Balanced",
+  aggressive: "Aggressive",
 };
 
 const rate = z.number().min(0).max(0.5);

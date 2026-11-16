@@ -70,7 +70,7 @@ function CopyLine({ text }: { text: string }) {
       <Button
         variant="ghost"
         size="icon-xs"
-        aria-label="Kopyala"
+        aria-label="Copy"
         onClick={() => {
           void navigator.clipboard?.writeText(text).then(() => {
             setCopied(true);
@@ -118,8 +118,8 @@ function FameSummary({ session, now }: { session: SessionRecord; now: number }) 
   const fame = session.fame;
   if (!fame) return (
     <div className="border-b border-border px-3 py-3 text-xs text-muted-foreground">
-      <span lang="en" className="font-medium text-foreground">Personal Fame</span> · Bu oturumda kendi karakterine ait Fame kaydı yok.
-      {!session.endedAt && " Yakalayıcı açıkken bölge değiştir; Fame kazandığında burada görünür."}
+      <span lang="en" className="font-medium text-foreground">Personal Fame</span> · No Fame for your character in this session.
+      {!session.endedAt && " Change zones while the capture is running; Fame shows up here as you earn it."}
     </div>
   );
   const seconds = Math.max(1, ((session.endedAt ?? now) - session.startedAt) / 1000);
@@ -129,14 +129,14 @@ function FameSummary({ session, now }: { session: SessionRecord; now: number }) 
     ["Fame (zone incl.)", formatSilver(fame.zoneIncluded)],
     ["Premium bonus", formatSilver(fame.premium)],
     ["Satchel bonus", formatSilver(fame.satchel)],
-    ["Bonus modifier (last)", fame.lastBonusPercent === null ? "Bilinmiyor" : `%${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(fame.lastBonusPercent)}`],
+    ["Bonus modifier (last)", fame.lastBonusPercent === null ? "Unknown" : `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(fame.lastBonusPercent)}%`],
   ];
   return (
     <div className="border-b border-border bg-fuchsia-500/5 px-3 py-3">
       <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
         <span lang="en" className="font-medium">Personal Fame</span>
         <span className="font-medium text-fuchsia-300">{fame.name}</span>
-        <span className="text-muted-foreground">· yalnızca bu oturumda alınan ödüller</span>
+        <span className="text-muted-foreground">· rewards earned in this session only</span>
       </div>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 xl:grid-cols-6">
         {metrics.map(([label, value]) => (
@@ -147,9 +147,9 @@ function FameSummary({ session, now }: { session: SessionRecord; now: number }) 
         ))}
       </dl>
       <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-        Total Fame, zone dahil Fame ile Premium ve Satchel katkılarının toplamıdır.
-        Bonus modifier son ödülde bildirilen orandır; Fame&apos;e zaten dahil olduğundan tekrar eklenmez.
-        Buff adı ve kalan süresi bu kayıtta bulunmaz. Kayıt sırasında alınamayan ödüller dahil değildir.
+        Total Fame is the zone-included Fame plus the Premium and Satchel contributions.
+        Bonus modifier is the rate reported with the last reward; it is already part of the Fame and is not added again.
+        Buff names and remaining time are not in this data. Rewards earned while the capture was not running are not included.
       </p>
     </div>
   );
@@ -170,13 +170,13 @@ function RunsSummary({ session, now }: { session: SessionRecord; now: number }) 
           </span>
           <span className="text-muted-foreground">
             · <span className="num">{formatSilver(balance.start)}</span> → <span className="num">{formatSilver(balance.end)}</span>
-            {" "}(toplanan silver, satış, alış ve tamir dahil)
+            {" "}(includes silver picked up, sales, purchases and repairs)
           </span>
         </div>
       )}
       {runs.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground">{runs.length} run</span>
+          <span className="text-muted-foreground">{runs.length} {runs.length === 1 ? "run" : "runs"}</span>
           {runs.map((r) => (
             <div key={r.startedAt} className="rounded-md border border-border px-2.5 py-1.5">
               <span lang="en" className="block font-medium">{zoneLabel(r.zone)}</span>
@@ -198,7 +198,7 @@ function SilverSummary({ session, now }: { session: SessionRecord; now: number }
   const silver = session.silver;
   if (!silver) return (
     <div className="border-b border-border px-3 py-3 text-xs text-muted-foreground">
-      <span lang="en" className="font-medium text-foreground">Silver</span> · Bu oturumda yerden toplanan silver kaydı yok.
+      <span lang="en" className="font-medium text-foreground">Silver</span> · No silver picked up in this session.
     </div>
   );
   const seconds = Math.max(1, ((session.endedAt ?? now) - session.startedAt) / 1000);
@@ -214,7 +214,7 @@ function SilverSummary({ session, now }: { session: SessionRecord; now: number }
       <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
         <span lang="en" className="font-medium">Silver</span>
         <span className="font-medium text-amber-300">{silver.name}</span>
-        <span className="text-muted-foreground">· yalnızca bu oturumda yerden toplanan</span>
+        <span className="text-muted-foreground">· picked up in this session only</span>
       </div>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 xl:grid-cols-6">
         {metrics.map(([label, value]) => (
@@ -225,8 +225,8 @@ function SilverSummary({ session, now }: { session: SessionRecord; now: number }
         ))}
       </dl>
       <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-        Picked up, bölge ve lonca vergisi düşüldükten sonra cebine giren silver&apos;dır. Party&apos;de yalnızca kendi payın
-        sayılır. Satış, alış ve tamir harcamaları dahil değildir.
+        Picked up is the silver you received after cluster and guild tax. In a party only your own share
+        is counted. Sales, purchases and repairs are not included.
       </p>
     </div>
   );
@@ -238,16 +238,16 @@ function MainHandCell({ player }: { player: PlayerStats }) {
     return (
       <span
         className="cursor-help text-xs text-muted-foreground underline decoration-dotted underline-offset-2"
-        title="Main Hand, oyuncu bölgeye girerken ya da ekipman değiştirince öğrenilir. Yakalayıcıyı başlattıktan sonra bir kez bölge değiştir."
+        title="The Main Hand is learned when a player enters the zone or changes equipment. Change zones once after starting the capture."
       >
-        Bilinmiyor
+        Unknown
       </span>
     );
   }
   const item = observation.item;
   if (!item) return <span lang="en" className="text-xs text-muted-foreground">Unarmed</span>;
   return (
-    <div className="flex items-center gap-2" title={`Son görülen Main Hand: ${item.nameEn} · T${item.tier}.${item.enchant}`}>
+    <div className="flex items-center gap-2" title={`Last seen Main Hand: ${item.nameEn} · T${item.tier}.${item.enchant}`}>
       <ItemIcon key={item.id} itemId={item.id} size={28} />
       <div className="min-w-0">
         <span lang="en" className="block max-w-44 truncate text-xs">{item.nameEn}</span>
@@ -282,9 +282,9 @@ function PlayerTable({
       <RunsSummary session={session} now={now} />
       <FameSummary session={session} now={now} />
       <SilverSummary session={session} now={now} />
-      <EmptyState title={session.endedAt !== null ? "Damage kaydı yok" : "Henüz damage yok"}>
-        {session.endedAt !== null ? "Bu oturumda eşleşen Damage kaydı bulunmuyor." :
-          "Oturum açık; vuruşlar geldikçe burada görünür. Bir oyuncunun adı çıkmıyorsa, o oyuncu bölgeye girdiğinde yakalayıcının çalışıyor olması gerekir (isimler bölgeye girişte gelir)."}
+      <EmptyState title={session.endedAt !== null ? "No damage recorded" : "No damage yet"}>
+        {session.endedAt !== null ? "No matched Damage in this session." :
+          "The session is open; hits show up here as they come in. If a player's name is missing, the capture has to be running when that player enters the zone (names arrive on zone entry)."}
       </EmptyState>
       </>
     );
@@ -299,12 +299,12 @@ function PlayerTable({
       <table className="w-full min-w-[840px] text-[13px]">
         <thead>
           <tr className="border-b border-border text-left text-[11px] tracking-wide text-muted-foreground uppercase">
-            <th className="px-3 py-2 font-medium">Oyuncu</th>
+            <th className="px-3 py-2 font-medium">Player</th>
             <th lang="en" className="px-3 py-2 font-medium">
-              <WithTip tip="Son görülen Main Hand. Ekipman paketi geldikçe güncellenir.">Main Hand</WithTip>
+              <WithTip tip="Last seen Main Hand. Updated whenever an equipment packet arrives.">Main Hand</WithTip>
             </th>
             <th lang="en" className="px-3 py-2 text-right font-medium">Damage</th>
-            <th className="w-[28%] px-3 py-2 font-medium">Pay</th>
+            <th className="w-[28%] px-3 py-2 font-medium">Share</th>
             <th lang="en" className="px-3 py-2 text-right font-medium">DPS</th>
             <th lang="en" className="px-3 py-2 text-right font-medium">Healing</th>
             <th lang="en" className="px-3 py-2 text-right font-medium">Damage Taken</th>
@@ -320,7 +320,7 @@ function PlayerTable({
                 <td className="px-3 py-2">
                   <span className="num mr-2 text-muted-foreground">{idx + 1}</span>
                   <span className="font-medium">{p.name}</span>
-                  {isSelf && <span className="ml-1.5 text-[11px] text-fuchsia-300">sen</span>}
+                  {isSelf && <span className="ml-1.5 text-[11px] text-fuchsia-300">you</span>}
                 </td>
                 <td className="px-3 py-2"><MainHandCell player={p} /></td>
                 <td className="num px-3 py-2 text-right">{formatSilver(p.damage)}</td>
@@ -343,17 +343,17 @@ function PlayerTable({
       </table>
       <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border px-3 py-2 text-xs text-muted-foreground">
         <span>
-          Süre <span className="num text-foreground">{formatDuration(end - session.startedAt)}</span>
+          Duration <span className="num text-foreground">{formatDuration(end - session.startedAt)}</span>
         </span>
         <span>
-          Toplam Damage <span className="num text-foreground">{formatSilver(total)}</span>
+          Total Damage <span className="num text-foreground">{formatSilver(total)}</span>
         </span>
         <span>
           Party DPS <span className="num text-foreground">{formatSilver(total / seconds)}</span>
         </span>
         {session.unattributedDamage > 0 && (
-          <span title="Sahibi eşleşmeyen damage: pet/summon veya adı yakalanmadan önce bölgeye girmiş oyuncular.">
-            Eşleşmeyen <span className="num text-foreground">{formatSilver(session.unattributedDamage)}</span>
+          <span title="Damage without a matched owner: pets/summons or players who entered the zone before their name was captured.">
+            Unattributed <span className="num text-foreground">{formatSilver(session.unattributedDamage)}</span>
           </span>
         )}
       </div>
@@ -365,12 +365,12 @@ function PlayerTable({
 /* ---------- connection ---------- */
 
 const LAUNCHER_TEXT: Record<DamageState["launcher"]["state"], string> = {
-  idle: "Kapalı",
-  starting: "Başlatılıyor…",
-  running: "Çalışıyor",
-  stopping: "Durduruluyor…",
-  denied: "İzin verilmedi",
-  error: "Başlatılamadı",
+  idle: "Off",
+  starting: "Starting…",
+  running: "Running",
+  stopping: "Stopping…",
+  denied: "Permission denied",
+  error: "Could not start",
 };
 
 /** Desktop app: one big Start/Stop button instead of terminal instructions. */
@@ -388,11 +388,11 @@ function LauncherControl({ s }: { s: DamageState }) {
     <div className="flex flex-wrap items-center gap-3 rounded-lg border border-fuchsia-400/25 bg-fuchsia-500/8 p-3">
       {active ? (
         <Button size="lg" variant="outline" onClick={() => stop.mutate()} disabled={busy} className="min-w-36">
-          {busy ? <Loader2 className="animate-spin" /> : <Square />} Durdur
+          {busy ? <Loader2 className="animate-spin" /> : <Square />} Stop
         </Button>
       ) : (
         <Button size="lg" onClick={() => start.mutate()} disabled={busy} className="min-w-36 bg-fuchsia-500 text-white hover:bg-fuchsia-400">
-          {busy ? <Loader2 className="animate-spin" /> : <Play />} Başlat
+          {busy ? <Loader2 className="animate-spin" /> : <Play />} Start
         </Button>
       )}
       <div className="min-w-0 flex-1 text-xs leading-relaxed">
@@ -400,8 +400,8 @@ function LauncherControl({ s }: { s: DamageState }) {
         <p className="text-muted-foreground">
           {l.message ??
             (l.state === "running"
-              ? "Oyun trafiği okunuyor. Uygulamayı kapatınca kendiliğinden durur."
-              : "Başlat'a bas; Windows bir kez izin soracak, “Evet” de.")}
+              ? "Reading game traffic. It stops by itself when you close the app."
+              : "Click Start; Windows asks for permission once — choose “Yes”.")}
         </p>
         {error && <p className="text-loss">{error.message}</p>}
       </div>
@@ -417,64 +417,63 @@ function ConnectionPanel({ s }: { s: DamageState }) {
       title={
         <span className="flex items-center gap-2">
           {c.connected ? <Wifi className="size-4 text-profit" /> : <WifiOff className="size-4 text-muted-foreground" />}
-          Yakalayıcı
+          Capture
         </span>
       }
       actions={
         c.connected ? (
           <Pill className="border-profit/30 text-profit">
-            Bağlı · <span className="num">{c.packetsPerSecond}</span> paket/sn
+            Connected · <span className="num">{c.packetsPerSecond}</span> packets/s
           </Pill>
         ) : (
-          <Pill className="border-border text-muted-foreground">Bekleniyor</Pill>
+          <Pill className="border-border text-muted-foreground">Waiting</Pill>
         )
       }
     >
       <div className="space-y-3 p-3">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
           <div>
-            <dt className="text-muted-foreground">Paket</dt>
+            <dt className="text-muted-foreground">Packets</dt>
             <dd className="num">{formatSilver(c.packetsReceived)}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Mesaj</dt>
+            <dt className="text-muted-foreground">Messages</dt>
             <dd className="num">{formatSilver(c.decode.messages)}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Tanınan oyuncu</dt>
+            <dt className="text-muted-foreground">Known players</dt>
             <dd className="num">{c.identitiesKnown}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Çözülemeyen</dt>
+            <dt className="text-muted-foreground">Undecoded</dt>
             <dd className="num">{c.decode.errors + c.decode.encrypted}</dd>
           </div>
         </dl>
         {desktop && <LauncherControl s={s} />}
         {!desktop && (
-          <Disclosure title="Kurulum (Windows)" defaultOpen={!c.connected && c.packetsReceived === 0}>
+          <Disclosure title="Setup (Windows)" defaultOpen={!c.connected && c.packetsReceived === 0}>
           <ol className="space-y-3">
             <Step n={1}>
               <p>
-                <code className="num">{CAPTURE_SOURCE}</code> dosyasını Windows bilgisayarına kopyala. Tek dosya; okuyup ne yaptığını
-                görebilirsin.
+                Copy <code className="num">{CAPTURE_SOURCE}</code> to the Windows PC. It is a single file; you can read it to see what it does.
               </p>
             </Step>
             <Step n={2}>
-              <p>Aynı klasörde PowerShell aç ve Windows&apos;un kendi derleyicisiyle derle (indirme gerekmez):</p>
+              <p>Open PowerShell in the same folder and compile it with Windows&apos; built-in compiler (no download needed):</p>
               <CopyLine text={COMPILE_CMD} />
             </Step>
             <Step n={3} done={c.connected}>
               <p>
-                PowerShell&apos;i yönetici olarak açıp, oyun açıkken aynı klasörde çalıştır. Baştaki <code className="num">.\</code>{" "}
-                PowerShell için gerekli:
+                Open PowerShell as administrator and run it in the same folder while the game is running. The leading <code className="num">.\</code>{" "}
+                is required by PowerShell:
               </p>
               {s.ingestUrls.length === 0 ? (
-                <p className="text-warn">Bu bilgisayarın yerel ağ adresi bulunamadı.</p>
+                <p className="text-warn">No local network address found for this computer.</p>
               ) : (
                 s.ingestUrls.map((u) => <CopyLine key={u} text={`.\\AlbionCapture.exe ${u}`} />)
               )}
               <p className="text-muted-foreground">
-                Uygulama aynı Windows bilgisayarında çalışıyorsa adres <code className="num">http://localhost:3100</code> olur.
+                If the app runs on the same Windows PC, the address is <code className="num">http://localhost:3100</code>.
               </p>
             </Step>
           </ol>
@@ -482,7 +481,7 @@ function ConnectionPanel({ s }: { s: DamageState }) {
         )}
         {c.decode.lastError && c.decode.errors > 0 && (
           <p className="text-[11px] text-muted-foreground">
-            Son çözme hatası: <span className="num">{c.decode.lastError}</span>
+            Last decode error: <span className="num">{c.decode.lastError}</span>
           </p>
         )}
       </div>
@@ -493,15 +492,15 @@ function ConnectionPanel({ s }: { s: DamageState }) {
 /* ---------- automation + calibration ---------- */
 
 function autoStatusText(s: DamageState): { tone: "ok" | "wait" | "off"; text: string } {
-  if (!s.settings.autoCalibrate && !s.config) return { tone: "off", text: "Otomatik kalibrasyon kapalı; aşağıdan elle yapabilirsin." };
+  if (!s.settings.autoCalibrate && !s.config) return { tone: "off", text: "Auto calibration is off; you can calibrate manually below." };
   if (s.config && s.auto.state === "stale") return { tone: "wait", text: s.auto.note };
   if (s.config) {
-    const when = new Date(s.config.calibratedAt).toLocaleString("tr-TR");
-    const how = s.config.source === "auto" ? "otomatik" : "elle";
-    return { tone: "ok", text: `Damage olayı tanındı (${how}, ${when}). Yamadan sonra bozulursa kendiliğinden yenilenir.` };
+    const when = new Date(s.config.calibratedAt).toLocaleString("en-GB");
+    const how = s.config.source === "auto" ? "automatically" : "manually";
+    return { tone: "ok", text: `Damage event recognised (${how}, ${when}). If a patch breaks it, it is renewed automatically.` };
   }
   if (s.auto.state === "waiting") return { tone: "wait", text: s.auto.note };
-  return { tone: "wait", text: "Bir mob'a vurduğunda damage olayı otomatik bulunacak." };
+  return { tone: "wait", text: "The damage event will be found automatically when you hit a mob." };
 }
 
 function ManualCalibration({ recording, connected }: { recording: DamageState["recording"]; connected: boolean }) {
@@ -541,36 +540,36 @@ function ManualCalibration({ recording, connected }: { recording: DamageState["r
   return (
     <div className="space-y-2.5 text-xs">
       <p className="text-muted-foreground">
-        Otomatik bulma bir şeyi yanlış tanırsa kullan: kayıt al, bir mob&apos;a vur, adayları oyunda gördüğün damage değerleriyle karşılaştır.
+        Use this if automatic detection gets something wrong: record, hit a mob, and compare the candidates with the damage numbers you saw in game.
       </p>
       <label className="block space-y-1">
-        <FieldLabel>Karakter adları (isteğe bağlı)</FieldLabel>
-        <Input value={names} onChange={(e) => setNames(e.target.value)} placeholder="Boş bırakırsan otomatik bulunur" className="h-8 text-[13px]" />
+        <FieldLabel>Character names (optional)</FieldLabel>
+        <Input value={names} onChange={(e) => setNames(e.target.value)} placeholder="Leave empty to detect automatically" className="h-8 text-[13px]" />
       </label>
       {recording ? (
         <div className="flex flex-wrap items-center gap-2">
           <Pill className="border-loss/40 text-loss">
-            <CircleDot className="size-3 animate-pulse" /> Kayıt · <span className="num">{recording.packets}</span> paket
+            <CircleDot className="size-3 animate-pulse" /> Recording · <span className="num">{recording.packets}</span> packets
           </Pill>
           <Button size="sm" onClick={() => stopAndAnalyze.mutate()} disabled={stopAndAnalyze.isPending}>
-            {stopAndAnalyze.isPending ? <Loader2 className="animate-spin" /> : <Square />} Durdur ve analiz et
+            {stopAndAnalyze.isPending ? <Loader2 className="animate-spin" /> : <Square />} Stop and analyse
           </Button>
         </div>
       ) : (
         <Button size="sm" variant="outline" onClick={() => startRec.mutate()} disabled={startRec.isPending || !connected}>
-          <Circle className="text-loss" /> Kaydı başlat
+          <Circle className="text-loss" /> Start recording
         </Button>
       )}
 
       {result &&
         (result.health.length === 0 ? (
           <p className="text-warn">
-            Kayıtta damage olayı bulunamadı ({result.packets} paket). Kayıt sırasında bölge değiştirip bir mob&apos;a vurduğundan emin ol.
-            {result.namesMissing.length > 0 && ` Kayıtta geçmeyen isimler: ${result.namesMissing.join(", ")}.`}
+            No damage event found in the recording ({result.packets} packets). Make sure you change zones and hit a mob while recording.
+            {result.namesMissing.length > 0 && ` Names not seen in the recording: ${result.namesMissing.join(", ")}.`}
           </p>
         ) : (
           <div className="space-y-2">
-            <div className="space-y-1.5" role="radiogroup" aria-label="Damage olayı adayları">
+            <div className="space-y-1.5" role="radiogroup" aria-label="Damage event candidates">
               {result.health.map((h, idx) => (
                 <label
                   key={`${h.rule.signature}-${h.rule.causerKey}-${h.rule.changeKey}`}
@@ -590,16 +589,16 @@ function ManualCalibration({ recording, connected }: { recording: DamageState["r
                     <span className="flex flex-wrap items-center gap-1.5">
                       <span className="num font-medium">{h.rule.signature}</span>
                       <span className="num text-muted-foreground">
-                        neden {h.rule.causerKey} · değişim {h.rule.changeKey}
-                        {h.rule.targetKey === null ? "" : ` · hedef ${h.rule.targetKey}`}
+                        causer {h.rule.causerKey} · change {h.rule.changeKey}
+                        {h.rule.targetKey === null ? "" : ` · target ${h.rule.targetKey}`}
                       </span>
-                      {idx === 0 && <Pill className="border-primary/40 text-primary">Önerilen</Pill>}
+                      {idx === 0 && <Pill className="border-primary/40 text-primary">Suggested</Pill>}
                       <span className="text-muted-foreground">
-                        {h.damageRows} vuruş · {h.subjectMobRows} mob&apos;a
+                        {h.damageRows} hits · {h.subjectMobRows} on mobs
                       </span>
                     </span>
                     <span className="block text-muted-foreground">
-                      Örnek damage değerleri: <span className="num text-foreground">{h.sampleDamage.join(", ")}</span>
+                      Sample damage values: <span className="num text-foreground">{h.sampleDamage.join(", ")}</span>
                     </span>
                     <span className="block text-muted-foreground">{h.byName.map((b) => `${b.name} ${formatCompact(b.damage)}`).join(" · ")}</span>
                   </span>
@@ -615,10 +614,10 @@ function ManualCalibration({ recording, connected }: { recording: DamageState["r
                 }}
                 disabled={!canSave || save.isPending}
               >
-                {save.isPending ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} Bu adayı kaydet
+                {save.isPending ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} Save this candidate
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setResult(null)}>
-                Vazgeç
+                Cancel
               </Button>
             </div>
           </div>
@@ -643,7 +642,7 @@ function AutomationPanel({ s }: { s: DamageState }) {
     <Panel
       title={
         <span className="flex items-center gap-2">
-          <Bot className="size-4 text-muted-foreground" /> Otomasyon
+          <Bot className="size-4 text-muted-foreground" /> Automation
         </span>
       }
       actions={
@@ -669,48 +668,48 @@ function AutomationPanel({ s }: { s: DamageState }) {
           <p className="min-w-0 flex-1 leading-relaxed">{status.text}</p>
           {s.config && (
             <Button variant="ghost" size="xs" onClick={() => clear.mutate()} disabled={clear.isPending}>
-              Sıfırla
+              Reset
             </Button>
           )}
         </div>
         {!s.capture.selfName && s.config && (
-          <p className="text-muted-foreground">Kendi adın bir sonraki bölge değişiminde tanınır.</p>
+          <p className="text-muted-foreground">Your name is recognised at the next zone change.</p>
         )}
 
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="flex items-center justify-between gap-3 rounded-md border border-border px-2.5 py-2">
             <span>
-              <span className="block font-medium">Otomatik kalibrasyon</span>
-              <span className="text-muted-foreground">Damage olayını canlı trafikten bulur.</span>
+              <span className="block font-medium">Auto calibration</span>
+              <span className="text-muted-foreground">Finds the damage event from live traffic.</span>
             </span>
             <Switch checked={s.settings.autoCalibrate} onCheckedChange={(v) => set({ autoCalibrate: v })} />
           </label>
           <label className="flex items-center justify-between gap-3 rounded-md border border-border px-2.5 py-2">
             <span>
-              <span className="block font-medium">Otomatik oturum</span>
-              <span className="text-muted-foreground">İlk vuruşta veya kendi Fame ödülünde başlar.</span>
+              <span className="block font-medium">Auto session</span>
+              <span className="text-muted-foreground">Starts on the first hit or your own Fame reward.</span>
             </span>
             <Switch checked={s.settings.autoSession} onCheckedChange={(v) => set({ autoSession: v })} />
           </label>
         </div>
         <label className="flex items-center gap-2">
-          <span className="text-muted-foreground">Oturumu kapatmak için sessizlik süresi</span>
+          <span className="text-muted-foreground">Close the session after this much inactivity</span>
           <NativeSelect
-            label="Sessizlik süresi"
+            label="Inactivity time"
             value={String(s.settings.idleMinutes)}
             onChange={(v) => set({ idleMinutes: Number(v) })}
             className="h-7 w-24 text-xs"
           >
             {IDLE_OPTIONS.map((m) => (
               <option key={m} value={m}>
-                {m} dk
+                {m} min
               </option>
             ))}
           </NativeSelect>
         </label>
         {saveSettings.error && <p className="text-loss">{saveSettings.error.message}</p>}
 
-        <Disclosure title="Elle kalibrasyon (gelişmiş)">
+        <Disclosure title="Manual calibration (advanced)">
           <ManualCalibration recording={s.recording} connected={s.capture.connected} />
         </Disclosure>
       </div>
@@ -779,15 +778,15 @@ export function DamageView() {
     <div className="pb-8">
       <PageHeader section="damage"
         title="Damage Meter"
-        description="Party için Damage, Healing ve Damage Taken; kendi karakterin için Fame ve bonus dökümü. Oturum ilk vuruşta veya kendi Fame ödülünde başlar."
+        description="Damage, Healing and Damage Taken for the party; Fame, silver and runs for your own character. A session starts on the first hit or your own Fame reward."
       />
       <div className="space-y-3 px-3 lg:px-4">
         <div className="flex gap-2.5 rounded-lg border border-border bg-card p-3 text-xs leading-relaxed">
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
           <p className="text-muted-foreground">
-            Yakalayıcı yalnızca oyunun <span className="text-foreground">aldığı</span> paketleri okur ve bu uygulamaya iletir; veriler bu
-            bilgisayardaki <code className="num">.data/damage</code> klasöründe kalır. Sandbox Interactive&apos;in yalnızca okuyan araçlara
-            göz yumduğu bilinse de bu resmi bir garanti değildir; kullanım riski sana aittir.
+            The capture only reads packets the game <span className="text-foreground">receives</span> and forwards them to this app; the data stays
+            on this computer. Sandbox Interactive is known to tolerate read-only tools, but that is not an official guarantee; use it at
+            your own risk.
           </p>
         </div>
 
@@ -809,10 +808,10 @@ export function DamageView() {
             <Panel
               title={
                 <span className="flex items-center gap-2">
-                  <Play className="size-4 text-muted-foreground" /> Oturum
+                  <Play className="size-4 text-muted-foreground" /> Session
                   {s!.session && (
                     <Pill className="border-loss/40 text-loss">
-                      <CircleDot className="size-3 animate-pulse" /> {s!.session.auto ? "Otomatik" : "Canlı"} ·{" "}
+                      <CircleDot className="size-3 animate-pulse" /> {s!.session.auto ? "Auto" : "Live"} ·{" "}
                       <span className="num">{formatDuration(s!.now - s!.session.startedAt)}</span>
                     </Pill>
                   )}
@@ -824,10 +823,10 @@ export function DamageView() {
                   <>
                     <p className="mr-auto text-xs text-muted-foreground">
                       <span className="text-foreground">{s!.session.label}</span>
-                      {s!.session.auto && ` · ${s!.settings.idleMinutes} dk etkinlik olmazsa kendiliğinden kaydedilir`}
+                      {s!.session.auto && ` · saved automatically after ${s!.settings.idleMinutes} min without activity`}
                     </p>
                     <Button size="sm" variant="destructive" onClick={() => stop.mutate()} disabled={stop.isPending}>
-                      {stop.isPending ? <Loader2 className="animate-spin" /> : <Square />} Şimdi bitir ve kaydet
+                      {stop.isPending ? <Loader2 className="animate-spin" /> : <Square />} End and save now
                     </Button>
                   </>
                 ) : (
@@ -835,22 +834,22 @@ export function DamageView() {
                     <p className="mr-auto text-xs text-muted-foreground">
                       {s!.settings.autoSession
                         ? s!.config
-                          ? "Bekleniyor: ilk vuruşta veya kendi Fame ödülünde oturum kendiliğinden başlar."
-                          : "Kendi Fame ödülün veya Damage olayı tanındığında oturum kendiliğinden başlar."
-                        : "Otomatik oturum kapalı; elle başlat."}
+                          ? "Waiting: a session starts by itself on the first hit or your own Fame reward."
+                          : "A session starts by itself once your Fame reward or the damage event is recognised."
+                        : "Auto session is off; start one manually."}
                     </p>
                     <label className="flex min-w-48 flex-col gap-1">
-                      <FieldLabel>Oturum adı (isteğe bağlı)</FieldLabel>
+                      <FieldLabel>Session name (optional)</FieldLabel>
                       <Input
                         value={label}
                         onChange={(e) => setLabel(e.target.value)}
-                        placeholder="Örn: T6 static – Undead"
+                        placeholder="e.g. T6 static – Undead"
                         className="h-8 text-[13px]"
                         maxLength={80}
                       />
                     </label>
                     <Button size="sm" variant="outline" onClick={() => start.mutate()} disabled={start.isPending || (!s!.config && !s!.capture.selfName)}>
-                      {start.isPending ? <Loader2 className="animate-spin" /> : <Play />} Elle başlat
+                      {start.isPending ? <Loader2 className="animate-spin" /> : <Play />} Start manually
                     </Button>
                   </>
                 )}
@@ -859,19 +858,19 @@ export function DamageView() {
               {s!.session ? (
                 <PlayerTable session={s!.session} now={s!.now} onlyNames={partyFilter} selfName={s!.capture.selfName} />
               ) : (
-                <EmptyState title="Çalışan oturum yok">
+                <EmptyState title="No session running">
                   {s!.lastAutoSave
-                    ? `Son oturum "${s!.lastAutoSave.label}" kaydedildi; aşağıdaki geçmişte.`
-                    : "Static'e girip savaşmaya başladığında tablo burada canlı dolar."}
+                    ? `The last session "${s!.lastAutoSave.label}" was saved; see the history below.`
+                    : "Enter a dungeon and start fighting; the table fills in live here."}
                 </EmptyState>
               )}
               <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2 text-xs">
                 <Switch checked={onlyParty} onCheckedChange={setOnlyParty} size="sm" disabled={nameList.length === 0} />
-                <span className="text-muted-foreground">Yalnızca şu isimleri göster:</span>
+                <span className="text-muted-foreground">Only show these names:</span>
                 <Input
                   value={names}
                   onChange={(e) => onNamesChange(e.target.value)}
-                  placeholder="Party üyeleri (virgülle) — isteğe bağlı"
+                  placeholder="Party members (comma-separated) — optional"
                   className="h-7 max-w-80 min-w-48 flex-1 text-xs"
                 />
               </div>
@@ -880,7 +879,7 @@ export function DamageView() {
             <Panel
               title={
                 <span className="flex items-center gap-2">
-                  <History className="size-4 text-muted-foreground" /> Geçmiş oturumlar
+                  <History className="size-4 text-muted-foreground" /> Session history
                 </span>
               }
             >
@@ -889,7 +888,7 @@ export function DamageView() {
               ) : sessions.isError ? (
                 <ErrorState error={sessions.error} onRetry={() => void sessions.refetch()} />
               ) : sessions.data.sessions.length === 0 ? (
-                <EmptyState title="Kayıtlı oturum yok">Biten oturumlar burada listelenir.</EmptyState>
+                <EmptyState title="No saved sessions">Finished sessions are listed here.</EmptyState>
               ) : (
                 <ul className="divide-y divide-border">
                   {sessions.data.sessions.map((x) => {
@@ -905,8 +904,8 @@ export function DamageView() {
                           >
                             <span className="block truncate text-[13px] font-medium">{x.label}</span>
                             <span className="text-muted-foreground">
-                              {new Date(x.startedAt).toLocaleString("tr-TR")} · {formatDuration((x.endedAt ?? x.startedAt) - x.startedAt)} ·{" "}
-                              {x.playerCount} oyuncu
+                              {new Date(x.startedAt).toLocaleString("en-GB")} · {formatDuration((x.endedAt ?? x.startedAt) - x.startedAt)} ·{" "}
+                              {x.playerCount} {x.playerCount === 1 ? "player" : "players"}
                             </span>
                           </button>
                           <span className="text-muted-foreground">
@@ -916,20 +915,20 @@ export function DamageView() {
                             {x.balanceChange != null && x.balanceChange !== 0 && (
                               <> · Balance <span className="num text-foreground">{x.balanceChange > 0 ? "+" : ""}{formatCompact(x.balanceChange)}</span></>
                             )}
-                            {(x.runCount ?? 0) > 1 && <> · {x.runCount} run</>}
+                            {(x.runCount ?? 0) > 1 && <> · {x.runCount} runs</>}
                             {x.topPlayer && (
                               <>
                                 {" "}
-                                · en yüksek <span className="text-foreground">{x.topPlayer}</span>
+                                · top <span className="text-foreground">{x.topPlayer}</span>
                               </>
                             )}
                           </span>
                           <Button
                             variant="ghost"
                             size="icon-xs"
-                            aria-label="Oturumu sil"
+                            aria-label="Delete session"
                             onClick={() => {
-                              if (window.confirm(`"${x.label}" oturumu kalıcı olarak silinsin mi?`)) remove.mutate(x.id);
+                              if (window.confirm(`Permanently delete the session "${x.label}"?`)) remove.mutate(x.id);
                             }}
                           >
                             <Trash2 />
@@ -954,10 +953,10 @@ export function DamageView() {
             </Panel>
 
             <p className="text-[11px] leading-relaxed text-muted-foreground/80">
-              Sayılar, yakalayıcının çalıştığı oyuncunun istemcisine gelen olaylardır: görüş menzili dışındaki party üyelerinin vuruşları
-              eksik olabilir. Pet/summon damage&apos;i &quot;eşleşmeyen&quot; olarak ayrı gösterilir. Self-healing ve
-              PvP damage, Damage toplamına sayılmaz. Healing, overhealing içerebilir. Fame ödülü veya silver toplaması olmayan çok kısa (10 vuruştan az)
-              otomatik oturumlar kaydedilmez. Main Hand sütunu son görülen ekipmanı gösterir; silah değiştikçe güncellenir.
+              Numbers are the events received by the client running the capture: hits by party members out of view range may be
+              missing. Pet/summon damage is shown separately as &quot;unattributed&quot;. Self-healing and
+              PvP damage are not counted in the Damage total. Healing may include overhealing. Very short auto sessions (fewer than 10 hits)
+              without a Fame reward or silver pickup are not saved. The Main Hand column shows the last seen equipment and updates when weapons change.
             </p>
           </>
         )}

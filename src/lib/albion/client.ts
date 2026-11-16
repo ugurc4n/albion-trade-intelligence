@@ -72,7 +72,7 @@ export class AlbionClient {
     params: Record<string, string | undefined>,
   ): string {
     for (const id of ids) {
-      if (!isValidItemId(id)) throw new AlbionApiError("invalid_response", `Geçersiz item id: ${id}`);
+      if (!isValidItemId(id)) throw new AlbionApiError("invalid_response", `Invalid item id: ${id}`);
     }
     const search = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") search.set(k, v);
@@ -113,7 +113,7 @@ export class AlbionClient {
   }
 
   private async fetchRows<T>(url: string, schema: z.ZodType<T>): Promise<FetchResult<T>> {
-    if (url.length > 4096) throw new AlbionApiError("invalid_response", `URL çok uzun (${url.length} > 4096)`);
+    if (url.length > 4096) throw new AlbionApiError("invalid_response", `URL too long (${url.length} > 4096)`);
     if (url.length > MAX_URL_LENGTH) {
       // Still valid for the API, but our batching should never produce this.
       console.warn(`[albion] URL length ${url.length} exceeds soft limit ${MAX_URL_LENGTH}`);
@@ -121,7 +121,7 @@ export class AlbionClient {
     const body = await this.request(url, true);
     const parsed = parseRows(schema, body);
     if (!parsed) {
-      throw this.fail(new AlbionApiError("invalid_response", "API beklenmeyen formatta yanıt döndü (dizi değil)."));
+      throw this.fail(new AlbionApiError("invalid_response", "The API returned an unexpected format (not an array)."));
     }
     if (parsed.invalid > 0) console.warn(`[albion] ${parsed.invalid} invalid rows dropped from ${url}`);
     return { rows: parsed.rows, invalidRows: parsed.invalid, url };
@@ -147,7 +147,7 @@ export class AlbionClient {
       throw this.fail(
         new AlbionApiError(
           isTimeout ? "timeout" : "network",
-          isTimeout ? "Albion Data API zaman aşımına uğradı." : `Albion Data API'ye ulaşılamadı: ${(err as Error).message}`,
+          isTimeout ? "The Albion Data API timed out." : `Could not reach the Albion Data API: ${(err as Error).message}`,
         ),
       );
     }
@@ -161,12 +161,12 @@ export class AlbionClient {
         return this.request(url, false);
       }
       throw this.fail(
-        new AlbionApiError("rate_limited", "Albion Data API istek limitine ulaşıldı (HTTP 429).", 429, retryAt),
+        new AlbionApiError("rate_limited", "Albion Data API rate limit reached (HTTP 429).", 429, retryAt),
       );
     }
 
     if (!res.ok) {
-      throw this.fail(new AlbionApiError("http", `Albion Data API HTTP ${res.status} döndü.`, res.status));
+      throw this.fail(new AlbionApiError("http", `The Albion Data API returned HTTP ${res.status}.`, res.status));
     }
 
     const text = await res.text();
@@ -177,9 +177,9 @@ export class AlbionClient {
       if (/throttled/i.test(text)) {
         const retryAt = this.now() + DEFAULT_429_BACKOFF_MS;
         this.limiter.pauseUntil(retryAt);
-        throw this.fail(new AlbionApiError("rate_limited", "Albion Data API istekleri kısıtladı.", res.status, retryAt));
+        throw this.fail(new AlbionApiError("rate_limited", "The Albion Data API is throttling requests.", res.status, retryAt));
       }
-      throw this.fail(new AlbionApiError("invalid_response", "API yanıtı JSON değil."));
+      throw this.fail(new AlbionApiError("invalid_response", "The API response is not JSON."));
     }
   }
 

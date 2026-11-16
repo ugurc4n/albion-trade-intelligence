@@ -14,7 +14,7 @@ async function call<T>(url: string, init?: RequestInit): Promise<T> {
   } catch {
     // non-JSON error body
   }
-  throw new ClientApiError(body.error?.message ?? `Sunucu hatası (HTTP ${res.status})`, body.error?.kind ?? "unknown", res.status);
+  throw new ClientApiError(body.error?.message ?? `Server error (HTTP ${res.status})`, body.error?.kind ?? "unknown", res.status);
 }
 
 const post = (body: unknown): RequestInit => ({

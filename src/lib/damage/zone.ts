@@ -41,11 +41,11 @@ const INSTANCE_NAMES: Record<string, string> = {
 };
 
 export function zoneLabel(zone: string | null): string {
-  if (!zone) return "Bilinmeyen bölge";
+  if (!zone) return "Unknown zone";
   const instance = zone.match(/^@([A-Z_]+)@/);
   if (instance) {
     const kind = instance[1];
     return INSTANCE_NAMES[kind] ?? kind.charAt(0) + kind.slice(1).toLowerCase().replace(/_/g, " ");
   }
-  return (zoneData.zones as Record<string, string>)[zone] ?? `Bölge ${zone}`;
+  return (zoneData.zones as Record<string, string>)[zone] ?? `Zone ${zone}`;
 }

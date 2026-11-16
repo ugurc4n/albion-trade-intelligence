@@ -75,10 +75,10 @@ function buildColumns(variant: Variant, maxAge: number) {
   });
   const route =
     variant === "flip"
-      ? helper.accessor((o) => o.buyCity, { id: "city", header: "Şehir", cell: (i) => <span className="text-xs">{i.getValue()}</span> })
+      ? helper.accessor((o) => o.buyCity, { id: "city", header: "City", cell: (i) => <span className="text-xs">{i.getValue()}</span> })
       : helper.accessor((o) => `${o.buyCity}>${o.sellCity}`, {
           id: "route",
-          header: "Rota",
+          header: "Route",
           cell: (i) => {
             const o = i.row.original;
             return (
@@ -97,21 +97,21 @@ function buildColumns(variant: Variant, maxAge: number) {
       ? [
           helper.accessor((o) => o.sourceBuyMax, {
             id: "buyMax",
-            header: "En yüksek Buy Order",
+            header: "Highest Buy Order",
             cell: (i) => <Silver value={i.getValue()} className="text-muted-foreground" />,
           }),
           helper.accessor((o) => o.sourceSellMin, {
             id: "sellMin",
-            header: "En düşük Sell Order",
+            header: "Lowest Sell Order",
             cell: (i) => <Silver value={i.getValue()} className="text-muted-foreground" />,
           }),
-          helper.accessor((o) => o.profit.buyPrice, { id: "buyPrice", header: "Önerilen alış", cell: (i) => <Silver value={i.getValue()} /> }),
-          helper.accessor((o) => o.profit.sellPrice, { id: "sellPrice", header: "Önerilen satış", cell: (i) => <Silver value={i.getValue()} /> }),
+          helper.accessor((o) => o.profit.buyPrice, { id: "buyPrice", header: "Suggested buy", cell: (i) => <Silver value={i.getValue()} /> }),
+          helper.accessor((o) => o.profit.sellPrice, { id: "sellPrice", header: "Suggested sell", cell: (i) => <Silver value={i.getValue()} /> }),
         ]
       : [
           helper.accessor((o) => o.profit.buyPrice, {
             id: "buyPrice",
-            header: "Alış",
+            header: "Buy",
             cell: (i) => (
               <div className="leading-tight">
                 <Silver value={i.getValue()} />
@@ -121,7 +121,7 @@ function buildColumns(variant: Variant, maxAge: number) {
           }),
           helper.accessor((o) => o.profit.sellPrice, {
             id: "sellPrice",
-            header: "Satış",
+            header: "Sell",
             cell: (i) => (
               <div className="leading-tight">
                 <Silver value={i.getValue()} />
@@ -137,28 +137,28 @@ function buildColumns(variant: Variant, maxAge: number) {
     ...priceCols,
     helper.accessor((o) => o.profit.unitProfit, {
       id: "unitProfit",
-      header: "Net kâr / adet",
+      header: "Net profit / unit",
       cell: (i) => <ProfitValue value={i.getValue()} />,
     }),
     helper.accessor((o) => o.profit.roi, { id: "roi", header: "ROI", cell: (i) => <RoiValue value={i.getValue()} /> }),
     helper.accessor((o) => o.targetDailyVolume ?? -1, {
       id: "volume",
-      header: "Hacim/gün",
+      header: "Volume/day",
       cell: (i) => {
         const v = i.row.original.targetDailyVolume;
-        return v === null ? <span className="text-xs text-muted-foreground">yok</span> : <span className="num">{formatDecimal(v)}</span>;
+        return v === null ? <span className="text-xs text-muted-foreground">none</span> : <span className="num">{formatDecimal(v)}</span>;
       },
     }),
-    helper.accessor((o) => o.recommendedQty, { id: "qty", header: "Adet", cell: (i) => <span className="num">{formatSilver(i.getValue())}</span> }),
-    helper.accessor((o) => o.requiredCapital, { id: "capital", header: "Sermaye", cell: (i) => <Silver value={i.getValue()} compact /> }),
+    helper.accessor((o) => o.recommendedQty, { id: "qty", header: "Qty", cell: (i) => <span className="num">{formatSilver(i.getValue())}</span> }),
+    helper.accessor((o) => o.requiredCapital, { id: "capital", header: "Capital", cell: (i) => <Silver value={i.getValue()} compact /> }),
     helper.accessor((o) => o.potentialProfit, {
       id: "potential",
-      header: "Potansiyel kâr",
+      header: "Potential profit",
       cell: (i) => <ProfitValue value={i.getValue()} compact />,
     }),
     helper.accessor((o) => o.dataAgeMinutes, {
       id: "age",
-      header: "Veri yaşı",
+      header: "Data age",
       cell: (i) => <FreshnessBadge minutes={i.getValue()} maxMinutes={maxAge} />,
     }),
     helper.accessor((o) => ({ low: 0, medium: 1, high: 2 })[o.risk], {
@@ -173,12 +173,12 @@ function buildColumns(variant: Variant, maxAge: number) {
     }),
     helper.accessor((o) => ({ low: 0, medium: 1, high: 2 })[o.confidence], {
       id: "confidence",
-      header: "Güven",
+      header: "Confidence",
       cell: (i) => <ConfidenceBadge confidence={i.row.original.confidence} />,
     }),
     helper.accessor((o) => o.score, {
       id: "score",
-      header: "Skor",
+      header: "Score",
       cell: (i) => <span className="num font-medium text-primary">{formatDecimal(i.getValue())}</span>,
     }),
   ]);
@@ -190,18 +190,18 @@ const DESKTOP_ONLY = new Set(["buyMax", "sellMin", "volume", "capital", "confide
 function Breakdown({ o }: { o: Opportunity }) {
   const p = o.profit;
   const rows: [string, number, string?][] = [
-    [o.buyMode === "instant" ? "Instant Buy fiyatı" : "Buy Order fiyatı", p.buyPrice],
-    ["Buy Order Setup Fee", -p.buySetupFee, o.buyMode === "order" ? undefined : "Instant Buy'da yok"],
-    [o.sellMode === "instant" ? "Instant Sell fiyatı" : "Sell Order fiyatı", p.sellPrice],
+    [o.buyMode === "instant" ? "Instant Buy price" : "Buy Order price", p.buyPrice],
+    ["Buy Order Setup Fee", -p.buySetupFee, o.buyMode === "order" ? undefined : "none for Instant Buy"],
+    [o.sellMode === "instant" ? "Instant Sell price" : "Sell Order price", p.sellPrice],
     ["Sales Tax", -p.salesTax],
-    ["Sell Order Setup Fee", -p.sellSetupFee, o.sellMode === "order" ? undefined : "Instant Sell'de yok"],
-    ["Yeniden listeleme (varsayım)", -p.relistCost],
-    ["Taşıma (varsayım)", -p.transport],
+    ["Sell Order Setup Fee", -p.sellSetupFee, o.sellMode === "order" ? undefined : "none for Instant Sell"],
+    ["Relists (assumption)", -p.relistCost],
+    ["Transport (assumption)", -p.transport],
   ];
   return (
     <div className="grid gap-4 px-3 py-3 text-xs md:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
       <div>
-        <p className="mb-1.5 font-medium">{SCENARIO_LABELS[o.scenario]} — birim hesap</p>
+        <p className="mb-1.5 font-medium">{SCENARIO_LABELS[o.scenario]} — per unit</p>
         <dl className="divide-y divide-border/60">
           {rows.map(([label, value, note]) => (
             <div key={label} className="flex justify-between gap-4 py-1">
@@ -213,47 +213,47 @@ function Breakdown({ o }: { o: Opportunity }) {
             </div>
           ))}
           <div className="flex justify-between gap-4 py-1 font-medium">
-            <dt>Net kâr / adet</dt>
+            <dt>Net profit / unit</dt>
             <dd>
               <ProfitValue value={p.unitProfit} />
             </dd>
           </div>
           <div className="flex justify-between gap-4 py-1">
-            <dt className="text-muted-foreground">Başabaş satış fiyatı</dt>
+            <dt className="text-muted-foreground">Break-even sell price</dt>
             <dd className="num">{formatSilver(Math.ceil(p.breakEvenSellPrice))}</dd>
           </div>
         </dl>
       </div>
       <div className="space-y-2 text-muted-foreground">
         <p>
-          <span className="text-foreground">Piyasa: </span>
-          {o.buyCity}: en düşük satış <Silver value={o.sourceSellMin} />, en yüksek alış <Silver value={o.sourceBuyMax} />
+          <span className="text-foreground">Market: </span>
+          {o.buyCity}: lowest sell <Silver value={o.sourceSellMin} />, highest buy <Silver value={o.sourceBuyMax} />
           {o.kind === "trade" && (
             <>
               {" · "}
-              {o.sellCity}: en düşük satış <Silver value={o.targetSellMin} />, en yüksek alış <Silver value={o.targetBuyMax} />
+              {o.sellCity}: lowest sell <Silver value={o.targetSellMin} />, highest buy <Silver value={o.targetBuyMax} />
             </>
           )}
         </p>
         <p>
-          <span className="text-foreground">Hacim (7 gün ort.): </span>
-          {o.buyCity} {o.sourceDailyVolume === null ? "veri yok" : `${formatDecimal(o.sourceDailyVolume)}/gün`}
-          {o.kind === "trade" && ` · ${o.sellCity} ${o.targetDailyVolume === null ? "veri yok" : `${formatDecimal(o.targetDailyVolume)}/gün`}`}
-          {o.volatility !== null && ` · oynaklık %${formatDecimal(o.volatility * 100)}`}
+          <span className="text-foreground">Volume (7-day avg.): </span>
+          {o.buyCity} {o.sourceDailyVolume === null ? "no data" : `${formatDecimal(o.sourceDailyVolume)}/day`}
+          {o.kind === "trade" && ` · ${o.sellCity} ${o.targetDailyVolume === null ? "no data" : `${formatDecimal(o.targetDailyVolume)}/day`}`}
+          {o.volatility !== null && ` · volatility ${formatDecimal(o.volatility * 100)}%`}
         </p>
         <p>
-          <span className="text-foreground">Tahmini bekleme: </span>
-          {o.estHoldDays === null ? "bilinmiyor" : o.estHoldDays === 0 ? "anında (derinlik garanti değil)" : `~${formatDecimal(o.estHoldDays)} gün (pazar payı varsayımıyla)`}
-          {o.weight > 0 && o.kind === "trade" && ` · ağırlık ${formatDecimal(o.weight)} kg/adet, toplam ${formatDecimal(o.weight * o.recommendedQty)} kg`}
+          <span className="text-foreground">Estimated wait: </span>
+          {o.estHoldDays === null ? "unknown" : o.estHoldDays === 0 ? "instant (depth not guaranteed)" : `~${formatDecimal(o.estHoldDays)} days (assuming a market share)`}
+          {o.weight > 0 && o.kind === "trade" && ` · weight ${formatDecimal(o.weight)} kg/unit, total ${formatDecimal(o.weight * o.recommendedQty)} kg`}
         </p>
         <p className="flex flex-wrap items-center gap-1">
           <FlagBadges flags={o.flags} />
         </p>
         <p className="text-[11px] text-muted-foreground/80">
-          Tahmini değerlerdir: Order&apos;ların dolması, fiyatların sabit kalması ve gösterilen derinliğin mevcut olması garanti değildir. Veri {formatAge(o.dataAgeMinutes)} önce görüldü.
+          These are estimates: orders filling, prices holding and the shown depth being available are not guaranteed. Data seen {formatAge(o.dataAgeMinutes)} ago.
         </p>
         <Link href={`/item/${encodeURIComponent(o.itemId)}`} className="inline-flex items-center gap-1 text-primary hover:underline">
-          Item detayı <ExternalLink className="size-3" />
+          Item details <ExternalLink className="size-3" />
         </Link>
       </div>
     </div>
@@ -386,21 +386,21 @@ export function OpportunityTable({
               value={pagination.pageSize}
               onChange={(e) => table.setPageSize(Number(e.target.value))}
               className="h-7 rounded-md border border-input bg-transparent px-1.5 text-xs"
-              aria-label="Sayfa başına satır"
+              aria-label="Rows per page"
             >
               {[25, 50, 100].map((n) => (
                 <option key={n} value={n} className="bg-popover">
-                  {n} satır
+                  {n} rows
                 </option>
               ))}
             </select>
-            <Button size="icon-sm" variant="outline" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} aria-label="Önceki sayfa">
+            <Button size="icon-sm" variant="outline" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} aria-label="Previous page">
               <ChevronLeft />
             </Button>
             <span className="num">
               {pagination.pageIndex + 1}/{table.getPageCount()}
             </span>
-            <Button size="icon-sm" variant="outline" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} aria-label="Sonraki sayfa">
+            <Button size="icon-sm" variant="outline" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} aria-label="Next page">
               <ChevronRight />
             </Button>
           </div>

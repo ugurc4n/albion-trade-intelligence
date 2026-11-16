@@ -82,15 +82,15 @@ function HistoryCharts({ series, quality }: { series: HistorySeries[]; quality: 
   const { max: priceMax, clipped } = useMemo(() => robustPriceMax(data), [data]);
   const cities = ROYAL_CITIES.filter((c) => data.some((d) => d[`${c}:price`] !== undefined));
   if (data.length === 0) {
-    return <EmptyState title="Veri bulunamadı">Bu Quality için son 30 günde kaydedilmiş satış geçmişi yok.</EmptyState>;
+    return <EmptyState title="No data">No sales history recorded for this Quality in the last 30 days.</EmptyState>;
   }
   const axis = { stroke: "var(--muted-foreground)", fontSize: 11, tickLine: false };
   return (
     <div className="grid gap-4 p-3 xl:grid-cols-2">
       <div>
         <p className="mb-2 text-xs text-muted-foreground">
-          Günlük ortalama satış fiyatı (gerçek geçmiş veri)
-          {clipped && <span className="text-warn"> · eksen uç değerlerde kırpıldı (tek seferlik aşırı fiyatlar var)</span>}
+          Daily average sell price (actual history)
+          {clipped && <span className="text-warn"> · axis clipped at the extremes (there are one-off extreme prices)</span>}
         </p>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 600, height: 256 }}>
@@ -124,7 +124,7 @@ function HistoryCharts({ series, quality }: { series: HistorySeries[]; quality: 
         </div>
       </div>
       <div>
-        <p className="mb-2 text-xs text-muted-foreground">Günlük gözlemlenen satış adedi (gerçek hacmin alt sınırı)</p>
+        <p className="mb-2 text-xs text-muted-foreground">Daily observed sales count (a lower bound on real volume)</p>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 600, height: 256 }}>
             <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -159,15 +159,15 @@ function PriceMatrix({
       <table className="w-full text-[13px]">
         <thead className="bg-surface">
           <tr className="border-b border-border text-[11px] tracking-wide text-muted-foreground uppercase">
-            <th className="h-8 px-3 text-left font-medium">Şehir</th>
-            <th className="px-2 text-right font-medium">En düşük satış</th>
-            <th className="px-2 text-left font-medium">Güncellik</th>
-            <th className="px-2 text-right font-medium">En yüksek alış</th>
-            <th className="px-2 text-left font-medium">Güncellik</th>
-            <th className="px-2 text-right font-medium">Fark</th>
-            <th className="px-2 text-right font-medium">7g ort. fiyat</th>
-            <th className="px-2 text-right font-medium">Hacim/gün</th>
-            <th className="px-2 text-right font-medium">Oynaklık</th>
+            <th className="h-8 px-3 text-left font-medium">City</th>
+            <th className="px-2 text-right font-medium">Lowest sell</th>
+            <th className="px-2 text-left font-medium">Freshness</th>
+            <th className="px-2 text-right font-medium">Highest buy</th>
+            <th className="px-2 text-left font-medium">Freshness</th>
+            <th className="px-2 text-right font-medium">Spread</th>
+            <th className="px-2 text-right font-medium">7d avg. price</th>
+            <th className="px-2 text-right font-medium">Volume/day</th>
+            <th className="px-2 text-right font-medium">Volatility</th>
           </tr>
         </thead>
         <tbody>
@@ -194,7 +194,7 @@ function PriceMatrix({
                   </>
                 ) : (
                   <td colSpan={5} className="px-2 text-xs text-muted-foreground">
-                    Veri bulunamadı
+                    No data
                   </td>
                 )}
                 <td className="px-2 text-right">
@@ -219,14 +219,14 @@ function OrderbookPanel({ detail, quality }: { detail: ItemDetailResponse; quali
   const quote = isPart(detail.prices) ? detail.prices.rows.find((q) => q.quality === quality && q.city === city) : undefined;
   const side = (levels: OrderbookLevel[], tone: string, latestQuoteAt: number | null) =>
     levels.length === 0 ? (
-      <p className="px-3 py-4 text-xs text-muted-foreground">Veri bulunamadı</p>
+      <p className="px-3 py-4 text-xs text-muted-foreground">No data</p>
     ) : (
       <table className="w-full text-[13px]">
         <thead>
           <tr className="text-[11px] text-muted-foreground uppercase">
-            <th className="px-3 py-1 text-right font-medium">Fiyat</th>
-            <th className="px-3 text-right font-medium">Adet</th>
-            <th className="px-3 text-right font-medium">Görüldü</th>
+            <th className="px-3 py-1 text-right font-medium">Price</th>
+            <th className="px-3 text-right font-medium">Qty</th>
+            <th className="px-3 text-right font-medium">Seen</th>
           </tr>
         </thead>
         <tbody>
@@ -236,7 +236,7 @@ function OrderbookPanel({ detail, quality }: { detail: ItemDetailResponse; quali
             <tr
               key={`${l.price}-${l.updated_at}`}
               className={cn("border-t border-border/50", superseded && "opacity-40")}
-              title={superseded ? "Daha yeni bir fiyat gözleminden önce görüldü — muhtemelen dolmuş veya iptal edilmiş." : undefined}
+              title={superseded ? "Seen before a newer price observation — probably filled or cancelled." : undefined}
             >
               <td className={cn("num px-3 py-1 text-right", tone, superseded && "line-through")}>{formatSilver(l.price)}</td>
               <td className="num px-3 text-right">{formatSilver(l.amount)}</td>
@@ -276,8 +276,8 @@ function OrderbookPanel({ detail, quality }: { detail: ItemDetailResponse; quali
         </div>
       </div>
       <p className="px-3 py-2 text-[11px] text-muted-foreground">
-        Fiyat seviyesi başına toplanmış; yalnızca oyuncu istemcilerinin gördüğü Order&apos;lar. Üstü çizili seviyeler, daha yeni bir fiyat gözleminden
-        önce görülmüştür ve muhtemelen artık yoktur; derinlik hesabına katılmaz.
+        Aggregated per price level; only orders seen by player clients. Struck-through levels were seen before a newer price observation
+        and are probably gone; they are left out of the depth calculation.
       </p>
     </div>
   );
@@ -287,23 +287,23 @@ function RiskNotes({ quotes, stats, maxAge, inUniverse }: { quotes: Quote[]; sta
   const now = useNow();
   const notes: string[] = [];
   const missing = ROYAL_CITIES.filter((c) => !quotes.some((q) => q.city === c));
-  if (missing.length) notes.push(`Fiyat verisi olmayan şehirler: ${missing.join(", ")}.`);
+  if (missing.length) notes.push(`Cities without price data: ${missing.join(", ")}.`);
   const stale = quotes.filter((q) => {
     const ages = [ageFrom(q.sellMinAt, now), ageFrom(q.buyMaxAt, now)].filter((a): a is number => a !== null);
     return ages.length > 0 && Math.min(...ages) > maxAge;
   });
-  if (stale.length) notes.push(`Eski fiyat (>${formatAge(maxAge)}): ${stale.map((q) => q.city).join(", ")}.`);
+  if (stale.length) notes.push(`Stale price (>${formatAge(maxAge)}): ${stale.map((q) => q.city).join(", ")}.`);
   const noVolume = ROYAL_CITIES.filter((c) => !stats.get(c) || stats.get(c)?.avgDailyVolume == null);
-  if (noVolume.length) notes.push(`Son 7 günde satış geçmişi olmayan şehirler: ${noVolume.join(", ")} — likidite bilinmiyor.`);
+  if (noVolume.length) notes.push(`Cities without sales history in the last 7 days: ${noVolume.join(", ")} — liquidity unknown.`);
   const volatile = ROYAL_CITIES.filter((c) => (stats.get(c)?.volatility ?? 0) > 0.2);
-  if (volatile.length) notes.push(`Fiyatı oynak (%20+ değişim katsayısı): ${volatile.join(", ")}.`);
+  if (volatile.length) notes.push(`Volatile price (20%+ coefficient of variation): ${volatile.join(", ")}.`);
   const thin = ROYAL_CITIES.filter((c) => {
     const v = stats.get(c)?.avgDailyVolume;
     return v != null && v < 5;
   });
-  if (thin.length) notes.push(`Düşük hacim (<5/gün): ${thin.join(", ")} — Order'lar uzun süre bekleyebilir.`);
-  if (!inUniverse) notes.push("Bu item otomatik tarama evreninde değil; fırsat tablolarında görünmez.");
-  if (notes.length === 0) notes.push("Belirgin veri riski tespit edilmedi. Yine de fiyatlar oyuncu istemcilerinden toplanır ve değişebilir.");
+  if (thin.length) notes.push(`Low volume (<5/day): ${thin.join(", ")} — orders may wait a long time.`);
+  if (!inUniverse) notes.push("This item is not in the automatic scan universe, so it does not appear in the opportunity tables.");
+  if (notes.length === 0) notes.push("No obvious data risk found. Prices are still collected from player clients and may change.");
   return (
     <ul className="list-disc space-y-1 py-3 pr-3 pl-7 text-xs text-muted-foreground">
       {notes.map((n) => (
@@ -402,10 +402,10 @@ export function ItemDetailView() {
         )}
 
         <Panel
-          title="Şehirlere göre güncel fiyatlar"
+          title="Current prices by city"
           actions={
             isPart(detail.prices) && (
-              <span className="text-[11px] text-muted-foreground">çekildi {formatAge(ageFrom(detail.prices.fetchedAt, now))} önce</span>
+              <span className="text-[11px] text-muted-foreground">fetched {formatAge(ageFrom(detail.prices.fetchedAt, now))} ago</span>
             )
           }
         >
@@ -416,7 +416,7 @@ export function ItemDetailView() {
           )}
         </Panel>
 
-        <Panel title="Geçmiş fiyat ve hacim (30 gün)">
+        <Panel title="Price and volume history (30 days)">
           {isPart(detail.history) ? (
             <HistoryCharts series={detail.history.series} quality={quality} />
           ) : (
@@ -428,19 +428,19 @@ export function ItemDetailView() {
           <Panel title="Order Book">
             <OrderbookPanel detail={detail} quality={quality} />
           </Panel>
-          <Panel title="Riskler">
+          <Panel title="Risks">
             <RiskNotes quotes={quotes} stats={stats} maxAge={settings.maxDataAgeMinutes} inUniverse={detail.inScanUniverse} />
           </Panel>
         </div>
 
-        <Panel title="Bu item için fırsatlar (tüm Quality seçenekleri, tüm şehirler)">
+        <Panel title="Opportunities for this item (all Qualities, all cities)">
           {oppQuery.isError && !opps ? (
             <ErrorState error={oppQuery.error} onRetry={() => oppQuery.refetch()} />
           ) : !opps ? (
             <TableSkeleton rows={4} />
           ) : opps.flips.items.length + opps.trades.items.length === 0 ? (
-            <EmptyState title="Güncel kârlı fırsat bulunamadı">
-              {detail.inScanUniverse ? "Ayarlardaki ROI ve veri yaşı eşiklerini geçen bir fırsat yok." : "Bu item tarama evreninde değil."}
+            <EmptyState title="No current profitable opportunities">
+              {detail.inScanUniverse ? "No opportunity passes the ROI and data-age thresholds from Settings." : "This item is not in the scan universe."}
             </EmptyState>
           ) : (
             <div className="divide-y divide-border">

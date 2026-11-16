@@ -47,10 +47,10 @@ class Launcher {
   }
 
   start(appBaseUrl: string, now: number) {
-    if (!this.available()) throw new Error("Yakalayıcı yalnızca Windows masaüstü uygulamasında başlatılabilir.");
+    if (!this.available()) throw new Error("The capture can only be started in the Windows desktop app.");
     if (this.state === "starting" || (this.state === "running" && !this.stopRequested)) return;
     this.stopRequested = false;
-    this.set("starting", "Windows izin penceresinde “Evet”e bas.", now);
+    this.set("starting", "Click “Yes” in the Windows permission prompt.", now);
 
     const exe = process.env.ATI_CAPTURE_EXE!;
     const args = [appBaseUrl, "--parent", String(process.pid)];
@@ -62,13 +62,13 @@ class Launcher {
     });
     let stderr = "";
     ps.stderr.on("data", (d: Buffer) => (stderr += d.toString()));
-    ps.on("error", (err) => this.set("error", `Yakalayıcı başlatılamadı: ${err.message}`, Date.now()));
+    ps.on("error", (err) => this.set("error", `Could not start the capture: ${err.message}`, Date.now()));
     ps.on("close", (code) => {
       if (code === 0) return; // launched; "running" follows with the first heartbeat
       const canceled = /cancel|iptal/i.test(stderr);
       this.set(
         canceled ? "denied" : "error",
-        canceled ? "İzin verilmedi. Başlat'a tekrar basıp Windows penceresinde “Evet” de." : `Yakalayıcı başlatılamadı. ${stderr.trim().slice(0, 300)}`,
+        canceled ? "Permission was not granted. Click Start again and choose “Yes” in the Windows prompt." : `Could not start the capture. ${stderr.trim().slice(0, 300)}`,
         Date.now(),
       );
     });
@@ -82,9 +82,9 @@ class Launcher {
   private refresh(now: number) {
     const silent = this.lastHeartbeat === null || now - this.lastHeartbeat > HEARTBEAT_TIMEOUT_MS;
     if (this.state === "stopping" && silent) this.set("idle", null, now);
-    else if (this.state === "running" && silent) this.set("idle", "Yakalayıcı durdu (oyun bilgisayarı uyku moduna geçmiş ya da kapatılmış olabilir).", now);
+    else if (this.state === "running" && silent) this.set("idle", "The capture stopped (the game PC may have gone to sleep or been shut down).", now);
     else if (this.state === "starting" && this.since !== null && now - this.since > START_TIMEOUT_MS && silent) {
-      this.set("error", "Yakalayıcı başladı ama uygulamaya bağlanamadı. Güvenlik yazılımı engelliyor olabilir.", now);
+      this.set("error", "The capture started but could not connect to the app. Security software may be blocking it.", now);
     }
   }
 

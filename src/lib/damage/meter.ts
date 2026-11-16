@@ -39,7 +39,7 @@ function newRun(zone: string | null, at: number): RunRecord {
 }
 
 function autoLabel(at: number): string {
-  return `Otomatik · ${new Date(at).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" })}`;
+  return `Auto · ${new Date(at).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}`;
 }
 
 /**

@@ -31,7 +31,7 @@ export function WithTip({ tip, children }: { tip: ReactNode; children: ReactNode
 }
 
 export function FreshnessBadge({ minutes, maxMinutes }: { minutes: number | null; maxMinutes: number }) {
-  if (minutes === null) return <Pill className="border-border text-muted-foreground">Veri yok</Pill>;
+  if (minutes === null) return <Pill className="border-border text-muted-foreground">No data</Pill>;
   const tone =
     minutes > maxMinutes
       ? "border-transparent bg-rose-500/15 text-rose-300"
@@ -39,16 +39,16 @@ export function FreshnessBadge({ minutes, maxMinutes }: { minutes: number | null
         ? "border-transparent bg-amber-400/12 text-amber-300"
         : "border-transparent bg-emerald-400/12 text-emerald-300";
   return (
-    <WithTip tip={`Kullanılan fiyatların en eskisi ${formatAge(minutes)} önce bir oyuncu istemcisi tarafından görüldü. Sınır: ${formatAge(maxMinutes)}.`}>
+    <WithTip tip={`The oldest price used was seen by a player client ${formatAge(minutes)} ago. Limit: ${formatAge(maxMinutes)}.`}>
       <Pill className={cn("num", tone)}>{formatAge(minutes)}</Pill>
     </WithTip>
   );
 }
 
 const RISK: Record<RiskLevel, { label: string; className: string }> = {
-  low: { label: "Düşük", className: "border-transparent bg-emerald-400/15 text-emerald-300" },
-  medium: { label: "Orta", className: "border-transparent bg-amber-400/15 text-amber-300" },
-  high: { label: "Yüksek", className: "border-transparent bg-rose-500/18 text-rose-300" },
+  low: { label: "Low", className: "border-transparent bg-emerald-400/15 text-emerald-300" },
+  medium: { label: "Medium", className: "border-transparent bg-amber-400/15 text-amber-300" },
+  high: { label: "High", className: "border-transparent bg-rose-500/18 text-rose-300" },
 };
 
 export function RiskBadge({ risk }: { risk: RiskLevel }) {
@@ -56,27 +56,27 @@ export function RiskBadge({ risk }: { risk: RiskLevel }) {
 }
 
 const CONF: Record<Confidence, { label: string; className: string }> = {
-  high: { label: "Yüksek", className: "text-foreground" },
-  medium: { label: "Orta", className: "text-muted-foreground" },
-  low: { label: "Düşük", className: "text-muted-foreground/70" },
+  high: { label: "High", className: "text-foreground" },
+  medium: { label: "Medium", className: "text-muted-foreground" },
+  low: { label: "Low", className: "text-muted-foreground/70" },
 };
 
 export function ConfidenceBadge({ confidence }: { confidence: Confidence }) {
   return (
-    <WithTip tip="Güven: hacim verisinin varlığı, fiyatların güncelliği ve fiyat tutarlılığına göre belirlenir. Hacim verisi yoksa en fazla 'Düşük'.">
+    <WithTip tip="Confidence: based on whether volume data exists, how fresh the prices are and how consistent they are. Without volume data it is at most 'Low'.">
       <span className={cn("text-xs", CONF[confidence].className)}>{CONF[confidence].label}</span>
     </WithTip>
   );
 }
 
 export const FLAG_INFO: Record<OpportunityFlag, { label: string; tip: string }> = {
-  no_volume: { label: "Hacim yok", tip: "Son 7 günde gözlemlenmiş satış verisi yok. Likidite bilinmiyor; önerilen adet en fazla 10." },
-  low_volume: { label: "Düşük hacim", tip: "Günde 5'ten az satış gözlemlendi. Order'lar uzun süre dolmayabilir." },
-  volatile: { label: "Oynak", tip: "Günlük ortalama fiyatların değişim katsayısı %20'nin üzerinde." },
-  price_outlier: { label: "Anomali", tip: "Kullanılan fiyat 7 günlük ortalamadan çok sapıyor (troll/eski Order olabilir)." },
-  extreme_roi: { label: "Aşırı ROI", tip: "ROI %150'nin üzerinde. Genellikle eski veya hatalı Order'lardan kaynaklanır." },
-  stale: { label: "Eski veri", tip: "Kullanılan fiyatlardan biri veri yaşı sınırını aşıyor. Güncel fırsat değildir." },
-  budget_exceeds: { label: "Bütçe üstü", tip: "Tek birimin maliyeti ticaret bütçesini aşıyor." },
+  no_volume: { label: "No volume", tip: "No sales observed in the last 7 days. Liquidity is unknown; the suggested quantity is capped at 10." },
+  low_volume: { label: "Low volume", tip: "Fewer than 5 sales a day observed. Orders may take a long time to fill." },
+  volatile: { label: "Volatile", tip: "The coefficient of variation of daily average prices is above 20%." },
+  price_outlier: { label: "Outlier", tip: "The price used deviates strongly from the 7-day average (may be a troll or stale order)." },
+  extreme_roi: { label: "Extreme ROI", tip: "ROI above 150%. Usually caused by stale or mistaken orders." },
+  stale: { label: "Stale data", tip: "One of the prices used is older than the data-age limit. Not a current opportunity." },
+  budget_exceeds: { label: "Over budget", tip: "A single unit costs more than the trade budget." },
 };
 
 export function FlagBadges({ flags }: { flags: OpportunityFlag[] }) {

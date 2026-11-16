@@ -14,11 +14,11 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
     const id = decodeURIComponent(raw);
     const server = serverSchema.parse(request.nextUrl.searchParams.get("server"));
     if (!isValidItemId(id)) {
-      return Response.json({ error: { kind: "bad_request", message: "Geçersiz item id." } }, { status: 400 });
+      return Response.json({ error: { kind: "bad_request", message: "Invalid item id." } }, { status: 400 });
     }
     const item = getCatalogItem(id);
     if (!item) {
-      return Response.json({ error: { kind: "not_found", message: "Item katalogda bulunamadı." } }, { status: 404 });
+      return Response.json({ error: { kind: "not_found", message: "Item not found in the catalog." } }, { status: 404 });
     }
     const detail = await getItemDetail(server, id);
     return Response.json({ item, server, inScanUniverse: isInUniverse(id), ...detail });

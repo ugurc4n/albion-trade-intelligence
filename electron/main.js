@@ -68,7 +68,7 @@ function waitForServer(url, deadline) {
         resolve();
       });
       req.on("error", () => {
-        if (Date.now() > deadline) reject(new Error("Uygulama sunucusu zamanında başlamadı."));
+        if (Date.now() > deadline) reject(new Error("The app server did not start in time."));
         else setTimeout(attempt, 250);
       });
       req.setTimeout(2000, () => req.destroy());
@@ -77,13 +77,13 @@ function waitForServer(url, deadline) {
   });
 }
 
-const LOADING_HTML = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${APP_NAME}</title>
+const LOADING_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${APP_NAME}</title>
 <style>html,body{height:100%;margin:0;background:#11132a;color:#e8e9ff;font-family:Segoe UI,system-ui,sans-serif}
 body{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px}
 .mark{width:48px;height:48px;background:#7c6cff;color:#fff;display:grid;place-items:center;font-weight:700;letter-spacing:.04em;
 clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px)}
 p{margin:0;font-size:13px;color:#a9abd6}</style></head>
-<body><div class="mark">AT</div><p>Başlatılıyor…</p></body></html>`;
+<body><div class="mark">AT</div><p>Starting…</p></body></html>`;
 
 async function start() {
   Menu.setApplicationMenu(null);
@@ -111,7 +111,7 @@ async function start() {
   try {
     const port = await freePort();
     const entry = serverEntry();
-    if (!fs.existsSync(entry)) throw new Error(`Sunucu dosyası bulunamadı: ${entry}`);
+    if (!fs.existsSync(entry)) throw new Error(`Server file not found: ${entry}`);
     const dataDir = path.join(app.getPath("userData"), "data");
     fs.mkdirSync(dataDir, { recursive: true });
     const exe = captureExe();
@@ -137,7 +137,7 @@ async function start() {
     server.on("exit", (code) => {
       server = null;
       if (!quitting) {
-        dialog.showErrorBox(APP_NAME, `Uygulama sunucusu beklenmedik şekilde kapandı (kod ${code}). Ayrıntılar: ${logFile}`);
+        dialog.showErrorBox(APP_NAME, `The app server exited unexpectedly (code ${code}). Details: ${logFile}`);
         app.quit();
       }
     });
@@ -146,7 +146,7 @@ async function start() {
     await waitForServer(`${url}/api/status`, Date.now() + START_TIMEOUT_MS);
     if (mainWindow) await mainWindow.loadURL(url);
   } catch (err) {
-    dialog.showErrorBox(APP_NAME, `Uygulama başlatılamadı.\n\n${err instanceof Error ? err.message : String(err)}`);
+    dialog.showErrorBox(APP_NAME, `The app could not be started.\n\n${err instanceof Error ? err.message : String(err)}`);
     app.quit();
   }
 }

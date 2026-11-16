@@ -62,12 +62,12 @@ export function ItemSearch() {
           else if (e.key === "Enter" && data[active]) go(data[active].id);
           else if (e.key === "Escape") setOpen(false);
         }}
-        placeholder="Item detayına git…"
+        placeholder="Go to item…"
         className="h-8 pl-8 text-[13px]"
         role="combobox"
         aria-expanded={open && data.length > 0}
         aria-controls="item-search-list"
-        aria-label="Item ara"
+        aria-label="Search items"
       />
       {open && query.length >= 2 && (
         <ul
@@ -75,7 +75,7 @@ export function ItemSearch() {
           role="listbox"
           className="absolute top-9 right-0 left-0 z-50 max-h-80 overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-lg"
         >
-          {data.length === 0 && <li className="px-3 py-2 text-xs text-muted-foreground">Sonuç yok</li>}
+          {data.length === 0 && <li className="px-3 py-2 text-xs text-muted-foreground">No results</li>}
           {data.map((item, i) => (
             <li key={item.id} role="option" aria-selected={i === active}>
               <button

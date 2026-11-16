@@ -25,7 +25,7 @@ async function handle<T>(res: Response): Promise<T> {
     // non-JSON error body
   }
   throw new ClientApiError(
-    body.error?.message ?? `Sunucu hatası (HTTP ${res.status})`,
+    body.error?.message ?? `Server error (HTTP ${res.status})`,
     body.error?.kind ?? "unknown",
     res.status,
     body.error?.retryAt,

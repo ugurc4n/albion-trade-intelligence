@@ -16,13 +16,12 @@ import { TONES } from "./tone";
 
 function Brand({ markOnly }: { markOnly?: boolean }) {
   return (
-    <Link href="/" className="flex shrink-0 items-center gap-2.5 px-1" aria-label="Albion Trade Intelligence — Panel">
+    <Link href="/" className="flex shrink-0 items-center gap-2.5 px-1" aria-label="Albion Trade Intelligence — Dashboard">
       <span className="chamfer grid size-8 place-items-center bg-violet-500 font-display text-[13px] font-bold tracking-wide text-white">
         AT
       </span>
       <span className={cn("leading-tight whitespace-nowrap", markOnly && "hidden sm:block")}>
         <span className="block font-display text-[14px] font-semibold tracking-wide">ALBION TRADE</span>
-        {/* Literal capitals: CSS uppercase under lang="tr" would turn the i into a dotted İ. */}
         <span className="block text-[11px] tracking-[0.2em] text-violet-300/80">INTELLIGENCE</span>
       </span>
     </Link>
@@ -44,7 +43,7 @@ function ActiveNavList({ onNavigate }: { onNavigate?: () => void }) {
 
 function NavList({ pathname, onNavigate }: { pathname: string | null; onNavigate?: () => void }) {
   return (
-    <nav className="flex flex-col gap-1" aria-label="Ana menü">
+    <nav className="flex flex-col gap-1" aria-label="Main menu">
       {NAV_SECTIONS.map((key) => {
         const { href, label, icon: Icon, tone } = SECTIONS[key];
         const t = TONES[tone];
@@ -81,22 +80,22 @@ function ProfileSummary() {
   return (
     <Link href="/settings" className="block rounded-md border border-sidebar-border bg-white/[0.03] p-2.5 text-xs hover:bg-white/[0.06]">
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-muted-foreground">Profil</span>
+        <span className="text-muted-foreground">Profile</span>
         <span className={cn("text-[11px]", settings.premium ? "text-amber-300" : "text-muted-foreground")}>
-          {settings.premium ? "Premium" : "Premium yok"}
+          {settings.premium ? "Premium" : "No Premium"}
         </span>
       </div>
       <dl className="space-y-0.5">
         <div className="flex justify-between">
-          <dt className="text-muted-foreground">Sunucu</dt>
+          <dt className="text-muted-foreground">Server</dt>
           <dd>{SERVERS[settings.server].label}</dd>
         </div>
         <div className="flex justify-between">
-          <dt className="text-muted-foreground">Ana şehir</dt>
+          <dt className="text-muted-foreground">Home city</dt>
           <dd>{settings.homeCity}</dd>
         </div>
         <div className="flex justify-between">
-          <dt className="text-muted-foreground">Bütçe</dt>
+          <dt className="text-muted-foreground">Budget</dt>
           <dd className="num">
             {formatCompact(settings.tradeBudget)} / {formatCompact(settings.totalSilver)}
           </dd>
@@ -116,14 +115,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mt-auto space-y-2">
           <ProfileSummary />
           <p className="px-1 text-[10px] leading-snug text-muted-foreground/70">
-            Veriler Albion Online Data Project&apos;ten (oyuncu istemcileri) gelir. Karar destek aracıdır; kâr garanti edilmez.
+            Data comes from the Albion Online Data Project (player clients). This is a decision aid; profit is not guaranteed.
           </p>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/70 px-3 backdrop-blur-md lg:px-4">
-          <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={() => setMenuOpen(true)} aria-label="Menüyü aç">
+          <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={() => setMenuOpen(true)} aria-label="Open menu">
             <Menu />
           </Button>
           <div className="lg:hidden">
@@ -138,7 +137,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
         <SheetContent side="left" className="w-64 bg-sidebar p-4">
-          <SheetTitle className="sr-only">Menü</SheetTitle>
+          <SheetTitle className="sr-only">Menu</SheetTitle>
           <div className="flex h-full flex-col gap-5">
             <Brand />
             <NavLinks onNavigate={() => setMenuOpen(false)} />

@@ -75,14 +75,14 @@ namespace AlbionCapture
             Uri appUri;
             if (!Uri.TryCreate(app, UriKind.Absolute, out appUri) || (appUri.Scheme != "http" && appUri.Scheme != "https"))
             {
-                Console.WriteLine("Geçersiz uygulama adresi: " + app);
-                Console.WriteLine("Örnek: .\\AlbionCapture.exe http://192.168.1.20:3100");
+                Console.WriteLine("Invalid app address: " + app);
+                Console.WriteLine("Example: .\\AlbionCapture.exe http://192.168.1.20:3100");
                 return 2;
             }
             if (!IsAdministrator())
             {
-                Console.WriteLine("Bu program yönetici olarak çalıştırılmalı (Windows ham soket izni).");
-                Console.WriteLine("PowerShell'i sağ tık > Yönetici olarak çalıştır ile açın, bu klasöre gelip komutu tekrar girin.");
+                Console.WriteLine("This program must run as administrator (Windows raw socket permission).");
+                Console.WriteLine("Open PowerShell with right-click > Run as administrator, go to this folder and run the command again.");
                 return 1;
             }
 
@@ -98,22 +98,22 @@ namespace AlbionCapture
                     t.IsBackground = true;
                     t.Start();
                     listening++;
-                    Console.WriteLine("Dinleniyor: " + ip);
+                    Console.WriteLine("Listening: " + ip);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Atlandı: " + ip + " (" + ex.Message + ")");
+                    Console.WriteLine("Skipped: " + ip + " (" + ex.Message + ")");
                 }
             }
             if (listening == 0)
             {
-                Console.WriteLine("Hiçbir ağ arayüzü dinlenemedi.");
+                Console.WriteLine("No network interface could be opened.");
                 return 1;
             }
 
             string ingestUrl = app + "/api/damage/ingest";
-            Console.WriteLine("Paketler gönderiliyor: " + ingestUrl);
-            Console.WriteLine("Durdurmak için Ctrl+C.");
+            Console.WriteLine("Sending packets to: " + ingestUrl);
+            Console.WriteLine("Press Ctrl+C to stop.");
             try
             {
                 Console.CancelKeyPress += delegate(object sender, ConsoleCancelEventArgs e)
@@ -144,18 +144,18 @@ namespace AlbionCapture
                 if (DateTime.UtcNow < nextStatus) continue;
                 nextStatus = DateTime.UtcNow.AddSeconds(5);
                 string line = string.Format(
-                    "[{0:HH:mm:ss}] yakalanan {1}, gönderilen {2}, düşen {3}, başarısız istek {4}",
+                    "[{0:HH:mm:ss}] captured {1}, sent {2}, dropped {3}, failed requests {4}",
                     DateTime.Now, Interlocked.Read(ref captured), Interlocked.Read(ref forwarded),
                     Interlocked.Read(ref dropped), Interlocked.Read(ref failedPosts));
                 Console.WriteLine(line);
                 string err = lastPostError;
                 if (err != null)
                 {
-                    Console.WriteLine("  son hata: " + err);
+                    Console.WriteLine("  last error: " + err);
                     lastPostError = null;
                 }
             }
-            Console.WriteLine("Durduruldu.");
+            Console.WriteLine("Stopped.");
             return 0;
         }
 
@@ -233,7 +233,7 @@ namespace AlbionCapture
                 catch (SocketException ex)
                 {
                     if (!running) break;
-                    Console.WriteLine("Okuma hatası (" + ip + "): " + ex.Message);
+                    Console.WriteLine("Read error (" + ip + "): " + ex.Message);
                     Thread.Sleep(1000);
                     continue;
                 }
