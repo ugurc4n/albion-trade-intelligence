@@ -103,14 +103,34 @@ describe("AlbionClient", () => {
 
 describe("RateLimiter", () => {
   it("never exceeds the window limit", async () => {
+    // Fake timers: wall-clock sampling inside tasks under parallel load used to make this flaky.
+    vi.useFakeTimers({ now: 0 });
+    try {
+      const interval = 80;
+      const limiter = new RateLimiter({ windows: [{ limit: 3, intervalMs: interval }], maxConcurrent: 10 });
+      const starts: number[] = [];
+      const done = Promise.all(Array.from({ length: 7 }, () => limiter.schedule(async () => starts.push(Date.now()))));
+      await vi.runAllTimersAsync();
+      await done;
+      // A slot frees up 1ms after the oldest request leaves the (now - interval, now] window.
+      expect(starts).toEqual([0, 0, 0, 81, 81, 81, 162]);
+      for (const t of starts) expect(starts.filter((s) => s > t - interval && s <= t).length).toBeLessThanOrEqual(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not over-admit when a timer wakes up early", async () => {
+    // Timers may fire slightly before the requested delay; the limiter must re-check and wait again.
+    let now = 0;
     const interval = 80;
-    const limiter = new RateLimiter({ windows: [{ limit: 3, intervalMs: interval }], maxConcurrent: 10 });
+    const sleep = async (ms: number) => {
+      now += Math.max(0, ms - 1);
+    };
+    const limiter = new RateLimiter({ windows: [{ limit: 2, intervalMs: interval }], maxConcurrent: 10, now: () => now, sleep });
     const starts: number[] = [];
-    const t0 = Date.now();
-    await Promise.all(Array.from({ length: 7 }, () => limiter.schedule(async () => starts.push(Date.now()))));
-    for (const t of starts) expect(starts.filter((s) => s > t - interval && s <= t).length).toBeLessThanOrEqual(3);
-    // 7 requests at 3 per window need at least two extra windows.
-    expect(Math.max(...starts) - t0).toBeGreaterThanOrEqual(2 * interval);
+    for (let i = 0; i < 6; i++) await limiter.schedule(async () => starts.push(now));
+    for (const t of starts) expect(starts.filter((s) => s > t - interval && s <= t).length).toBeLessThanOrEqual(2);
   });
 
   it("respects the concurrency cap", async () => {
