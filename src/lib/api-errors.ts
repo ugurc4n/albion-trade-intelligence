@@ -3,7 +3,7 @@ import { AlbionApiError } from "@/lib/albion/client";
 
 export type ApiErrorBody = { error: { kind: string; message: string; retryAt?: number } };
 
-/** Maps internal errors to a JSON response with a user-facing Turkish message. */
+/** Maps internal errors to a JSON response with a user-facing message. */
 export function errorResponse(err: unknown): Response {
   if (err instanceof ZodError) {
     return Response.json(
@@ -12,7 +12,7 @@ export function errorResponse(err: unknown): Response {
     );
   }
   if (err instanceof AlbionApiError) {
-    const status = err.kind === "rate_limited" ? 503 : err.kind === "timeout" ? 504 : 502;
+    const status = err.kind === "rate_limited" ? 503 : err.kind === "timeout" ? 504 : err.status === 404 ? 404 : 502;
     return Response.json(
       { error: { kind: err.kind, message: err.message, retryAt: err.retryAt } } satisfies ApiErrorBody,
       { status },

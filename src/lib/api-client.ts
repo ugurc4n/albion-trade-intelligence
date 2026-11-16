@@ -1,6 +1,7 @@
 /** Client-side fetch helpers for our own route handlers (never the Albion API directly). */
 import type { OpportunitiesResponse } from "@/lib/opportunities";
 import type { CatalogItem } from "@/lib/catalog/types";
+import type { PlayerResponse, PlayerSummary } from "@/lib/killboard/types";
 import type { HistorySeries, OrderbookEntry } from "@/lib/albion/schemas";
 import type { Quote } from "@/lib/market/types";
 import type { Filters, Settings } from "@/lib/settings/schema";
@@ -70,4 +71,14 @@ export async function searchItems(q: string, signal?: AbortSignal): Promise<Cata
 
 export function isPart<T extends object>(part: Part<T>): part is T {
   return !("error" in part);
+}
+
+export async function searchPlayers(q: string, server: string, signal?: AbortSignal): Promise<PlayerSummary[]> {
+  const res = await fetch(`/api/players/search?q=${encodeURIComponent(q)}&server=${server}`, { signal });
+  return (await handle<{ players: PlayerSummary[] }>(res)).players;
+}
+
+export async function fetchPlayer(id: string, server: string, signal?: AbortSignal): Promise<PlayerResponse> {
+  const res = await fetch(`/api/players/${encodeURIComponent(id)}?server=${server}`, { signal });
+  return handle<PlayerResponse>(res);
 }

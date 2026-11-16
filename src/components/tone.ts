@@ -2,7 +2,7 @@
  * Section colours for the "Avalon Gecesi" theme. Every section of the app has one tone; class names are
  * spelled out in full so Tailwind can see them.
  */
-export type Tone = "violet" | "cyan" | "sky" | "amber" | "emerald" | "fuchsia" | "slate";
+export type Tone = "violet" | "cyan" | "sky" | "amber" | "emerald" | "fuchsia" | "rose" | "slate";
 
 export const TONES: Record<Tone, { text: string; soft: string; solid: string; ring: string; border: string; bar: string }> = {
   violet: {
@@ -52,6 +52,14 @@ export const TONES: Record<Tone, { text: string; soft: string; solid: string; ri
     ring: "ring-fuchsia-400/25",
     border: "border-fuchsia-400/35",
     bar: "bg-fuchsia-400",
+  },
+  rose: {
+    text: "text-rose-300",
+    soft: "bg-rose-500/14",
+    solid: "bg-rose-500 text-white",
+    ring: "ring-rose-400/25",
+    border: "border-rose-400/35",
+    bar: "bg-rose-400",
   },
   slate: {
     text: "text-slate-300",

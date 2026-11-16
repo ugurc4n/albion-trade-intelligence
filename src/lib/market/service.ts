@@ -3,7 +3,7 @@
  * Never import this from client components.
  */
 import { AlbionApiError, AlbionClient } from "@/lib/albion/client";
-import { chunkIds } from "@/lib/albion/batching";
+import { chunkIds, isValidItemId } from "@/lib/albion/batching";
 import { CACHE_TTL, MAX_URL_LENGTH, ROYAL_CITIES, toRoyalCity, type ServerId } from "@/lib/albion/constants";
 import { TtlCache } from "@/lib/albion/cache";
 import type { HistorySeries, OrderbookEntry, PriceRow } from "@/lib/albion/schemas";
@@ -191,6 +191,53 @@ export async function getOrderbooks(server: ServerId, itemIds: string[]): Promis
     }
   });
   return result;
+}
+
+/** Sell prices older than this are not used to value lost gear. */
+const VALUE_MAX_AGE_MS = 7 * DAY_MS;
+
+/**
+ * Estimated unit value per item and Quality: the median of the Royal Cities' lowest Sell Orders seen in the
+ * last week. A median keeps a single troll listing from setting the value. Fetched in batches, cached per item.
+ * Returns a lookup; unknown items or items without a recent price give null.
+ */
+export async function getItemValues(server: ServerId, itemIds: string[]): Promise<(itemId: string, quality: number) => number | null> {
+  const { client, cache } = services();
+  const ids = [...new Set(itemIds)].filter(isValidItemId);
+  const quotes = new Map<string, Quote[]>();
+  const missing: string[] = [];
+  const now = Date.now();
+  for (const id of ids) {
+    const hit = cache.peek<Quote[]>(`value:${server}:${id}`);
+    if (hit && now - hit.fetchedAt <= CACHE_TTL.pricesMs) quotes.set(id, hit.value);
+    else missing.push(id);
+  }
+  if (missing.length > 0) {
+    const chunks = chunkIds(missing, (c) => AlbionClient.buildUrl(server, "prices", c, { locations: ROYAL_CITIES.join(",") }), MAX_URL_LENGTH);
+    const settled = await Promise.allSettled(chunks.map((c) => client.getPrices(server, c, ROYAL_CITIES)));
+    settled.forEach((r, i) => {
+      if (r.status !== "fulfilled") return;
+      const byItem = new Map<string, Quote[]>(chunks[i].map((id) => [id, []]));
+      for (const row of r.value.rows) {
+        const q = normalizePriceRow(row);
+        if (q) byItem.get(q.itemId)?.push(q);
+      }
+      for (const [id, list] of byItem) {
+        quotes.set(id, list);
+        cache.put(`value:${server}:${id}`, list);
+      }
+    });
+    if (settled.every((r) => r.status === "rejected") && quotes.size === 0) throw (settled[0] as PromiseRejectedResult).reason;
+  }
+  return (itemId, quality) => {
+    const prices = (quotes.get(itemId) ?? [])
+      .filter((q) => q.quality === Math.max(1, quality) && q.sellMin !== null && q.sellMinAt !== null && now - q.sellMinAt <= VALUE_MAX_AGE_MS)
+      .map((q) => q.sellMin!)
+      .sort((a, b) => a - b);
+    if (prices.length === 0) return null;
+    const mid = Math.floor(prices.length / 2);
+    return prices.length % 2 ? prices[mid] : (prices[mid - 1] + prices[mid]) / 2;
+  };
 }
 
 export type ItemDetailData = {
