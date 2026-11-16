@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Barlow, Chakra_Petch, IBM_Plex_Mono } from "next/font/google";
-import { AppShell } from "@/components/app-shell";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -20,7 +19,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`dark ${body.variable} ${display.variable} ${numeric.variable} h-full antialiased`}>
       <body className="min-h-full">
         <Providers>
-          <AppShell>{children}</AppShell>
+          {children}
         </Providers>
       </body>
     </html>

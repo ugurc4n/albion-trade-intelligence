@@ -5,8 +5,10 @@
  * utility process, then shows it in a window. Everything the web app does (market scans, Avalon roads,
  * damage meter) runs locally; the damage meter's Start button launches resources/capture/AlbionCapture.exe.
  * User data (damage sessions, calibration) lives in the per-user app data folder, not the install folder.
+ * The in-game overlay is a separate always-on-top, transparent window showing /overlay; it never touches the
+ * game process (no injection or hooks), it only floats above a game running in borderless windowed mode.
  */
-const { app, BrowserWindow, Menu, shell, utilityProcess, dialog } = require("electron");
+const { app, BrowserWindow, Menu, shell, utilityProcess, dialog, globalShortcut, ipcMain, screen } = require("electron");
 const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
@@ -14,10 +16,16 @@ const path = require("node:path");
 
 const APP_NAME = "Albion Trade Intelligence";
 const START_TIMEOUT_MS = 60_000;
+const PRELOAD = path.join(__dirname, "preload.js");
+const OVERLAY_TOGGLE_KEY = "CommandOrControl+Shift+O";
+const OVERLAY_LOCK_KEY = "CommandOrControl+Shift+L";
 
 let server = null;
 let mainWindow = null;
 let quitting = false;
+let appUrl = null;
+let overlay = null;
+let overlayLocked = false;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -96,10 +104,14 @@ async function start() {
     backgroundColor: "#11132a",
     autoHideMenuBar: true,
     show: false,
-    webPreferences: { contextIsolation: true, sandbox: true },
+    webPreferences: { contextIsolation: true, sandbox: true, preload: PRELOAD },
   });
   mainWindow.once("ready-to-show", () => mainWindow.show());
-  mainWindow.on("closed", () => (mainWindow = null));
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+    // The overlay belongs to the main window: closing the app closes it too.
+    app.quit();
+  });
   await mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(LOADING_HTML)}`);
 
   // Links to other sites (render.albiononline.com icons are images, not links) open in the normal browser.
@@ -144,7 +156,11 @@ async function start() {
 
     const url = `http://127.0.0.1:${port}`;
     await waitForServer(`${url}/api/status`, Date.now() + START_TIMEOUT_MS);
+    appUrl = url;
     if (mainWindow) await mainWindow.loadURL(url);
+    // Global so they work while the game has focus; a key already taken by another app is simply skipped.
+    globalShortcut.register(OVERLAY_TOGGLE_KEY, toggleOverlay);
+    globalShortcut.register(OVERLAY_LOCK_KEY, () => setOverlayLocked(!overlayLocked));
   } catch (err) {
     dialog.showErrorBox(APP_NAME, `The app could not be started.\n\n${err instanceof Error ? err.message : String(err)}`);
     app.quit();
@@ -157,4 +173,87 @@ app.on("before-quit", () => {
   if (server) server.kill();
 });
 
+app.on("will-quit", () => globalShortcut.unregisterAll());
+
 app.on("window-all-closed", () => app.quit());
+
+/* ---------- in-game overlay ---------- */
+
+const overlayFile = () => path.join(app.getPath("userData"), "overlay.json");
+
+/** Saved position and size, used only if it is still on one of the connected screens. */
+function savedOverlayBounds() {
+  try {
+    const b = JSON.parse(fs.readFileSync(overlayFile(), "utf8"));
+    if (![b.x, b.y, b.width, b.height].every(Number.isFinite)) return null;
+    const visible = screen.getAllDisplays().some(({ workArea: a }) => b.x + 40 > a.x && b.x < a.x + a.width - 40 && b.y >= a.y && b.y < a.y + a.height - 40);
+    return visible ? b : null;
+  } catch {
+    return null;
+  }
+}
+
+function notifyOverlayOpen(open) {
+  mainWindow?.webContents.send("overlay:open", open);
+}
+
+function setOverlayLocked(locked) {
+  if (!overlay) return;
+  overlayLocked = locked;
+  // Locked: clicks go through to the game underneath.
+  overlay.setIgnoreMouseEvents(locked, { forward: true });
+  overlay.webContents.send("overlay:locked", locked);
+}
+
+function toggleOverlay() {
+  if (overlay) overlay.close();
+  else openOverlay();
+}
+
+function openOverlay() {
+  if (!appUrl || overlay) return;
+  const area = screen.getPrimaryDisplay().workArea;
+  const saved = savedOverlayBounds();
+  overlay = new BrowserWindow({
+    x: saved?.x ?? area.x + area.width - 340,
+    y: saved?.y ?? area.y + 80,
+    width: saved?.width ?? 320,
+    height: saved?.height ?? 260,
+    minWidth: 240,
+    minHeight: 120,
+    title: `${APP_NAME} overlay`,
+    frame: false,
+    transparent: true,
+    backgroundColor: "#00000000",
+    hasShadow: false,
+    resizable: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: { contextIsolation: true, sandbox: true, preload: PRELOAD },
+  });
+  // Above borderless-windowed games; does not steal focus from the game when it appears.
+  overlay.setAlwaysOnTop(true, "screen-saver");
+  overlayLocked = false;
+  overlay.once("ready-to-show", () => overlay?.showInactive());
+  overlay.on("close", () => {
+    try {
+      fs.writeFileSync(overlayFile(), JSON.stringify(overlay.getBounds()));
+    } catch {
+      // not being able to remember the position is harmless
+    }
+  });
+  overlay.on("closed", () => {
+    overlay = null;
+    overlayLocked = false;
+    notifyOverlayOpen(false);
+  });
+  overlay.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  overlay.loadURL(`${appUrl}/overlay`);
+  notifyOverlayOpen(true);
+}
+
+ipcMain.on("overlay:toggle", toggleOverlay);
+ipcMain.on("overlay:close", () => overlay?.close());
+ipcMain.on("overlay:lock", (_event, locked) => setOverlayLocked(Boolean(locked)));
+ipcMain.handle("overlay:is-open", () => overlay !== null);

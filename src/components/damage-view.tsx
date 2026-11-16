@@ -11,6 +11,7 @@ import {
   Crosshair,
   History,
   Loader2,
+  PictureInPicture2,
   Play,
   ShieldCheck,
   Square,
@@ -19,7 +20,7 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Pill, TierBadge, WithTip } from "@/components/badges";
 import { FieldLabel, NativeSelect } from "@/components/filters-bar";
 import { ItemIcon } from "@/components/item-icon";
@@ -33,6 +34,7 @@ import { damageApi, formatDuration, parseNames, type CalibrationResponse } from 
 import type { DamageState } from "@/lib/damage/service";
 import { sessionKills, type DamageConfig, type DamageSettings, type PlayerStats, type SessionRecord } from "@/lib/damage/types";
 import { zoneLabel } from "@/lib/damage/zone";
+import { desktopApi, OVERLAY_LOCK_KEYS, OVERLAY_TOGGLE_KEYS } from "@/lib/desktop";
 import { formatCompact, formatPercent, formatSilver } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -421,6 +423,35 @@ function LauncherControl({ s }: { s: DamageState }) {
   );
 }
 
+/** The desktop bridge is there from the first render and never changes. */
+const subscribeNothing = () => () => {};
+
+/** Desktop app only: shows or hides the always-on-top in-game overlay. */
+function OverlayControl() {
+  const available = useSyncExternalStore(subscribeNothing, () => desktopApi() !== null, () => false);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const api = desktopApi();
+    if (!api) return;
+    void api.overlay.isOpen().then(setOpen);
+    return api.overlay.onOpenChange(setOpen);
+  }, []);
+  if (!available) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3">
+      <Button size="sm" variant={open ? "outline" : "default"} onClick={() => desktopApi()?.overlay.toggle()} className="min-w-36">
+        <PictureInPicture2 /> {open ? "Hide overlay" : "Show overlay"}
+      </Button>
+      <p className="min-w-0 flex-1 text-xs leading-relaxed text-muted-foreground">
+        A small always-on-top window with the damage ranking and your Fame/silver rates. Drag it by its title bar and resize it
+        from the edges. <span className="text-foreground">{OVERLAY_TOGGLE_KEYS}</span> shows or hides it,{" "}
+        <span className="text-foreground">{OVERLAY_LOCK_KEYS}</span> locks it so clicks pass through to the game. Play in{" "}
+        <span lang="en" className="text-foreground">Windowed Fullscreen</span> mode; exclusive fullscreen hides other windows.
+      </p>
+    </div>
+  );
+}
+
 function ConnectionPanel({ s }: { s: DamageState }) {
   const c = s.capture;
   const desktop = s.launcher.available;
@@ -462,6 +493,7 @@ function ConnectionPanel({ s }: { s: DamageState }) {
           </div>
         </dl>
         {desktop && <LauncherControl s={s} />}
+        <OverlayControl />
         {!desktop && (
           <Disclosure title="Setup (Windows)" defaultOpen={!c.connected && c.packetsReceived === 0}>
           <ol className="space-y-3">
