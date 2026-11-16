@@ -125,7 +125,7 @@ describe("AutoCalibrator", () => {
 
     const withoutSelf: DamageConfig = { ...good, identity: good.identity.filter((r) => !r.signature.startsWith("response")) };
     const added = cal.evaluate(withoutSelf, 2)!;
-    expect(added.reason).toBe("identity-added");
+    expect(added.reason).toBe("identity-changed");
     expect(added.config.identity).toHaveLength(good.identity.length);
     expect(added.config.health).toEqual(withoutSelf.health);
 

@@ -10,6 +10,8 @@ import type { MainHandObservation } from "./types";
  * https://github.com/Triky313/AlbionOnline-StatisticsAnalysis/tree/main/src/StatisticsAnalysisTool/Network
  */
 export const EQUIPMENT_CHANGED_EVENT = 90;
+/** NewCharacter: a character (re)spawning in view — the authoritative id → name pairing within a zone. */
+export const NEW_CHARACTER_EVENT = 29;
 
 /** undefined: no usable equipment field; null: item index unknown (clear any previous weapon). */
 export function readMainHand(msg: PhotonMessage, key: number): MainHandObservation | null | undefined {

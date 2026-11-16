@@ -14,12 +14,14 @@ const INTERVAL_CALIBRATED_MS = 60_000;
 
 export type AutoCalibrationStatus =
   | { state: "waiting"; note: string; checkedAt: number | null }
-  | { state: "applied"; reason: "initial" | "recalibrated" | "identity-added"; at: number }
+  | { state: "applied"; reason: AutoReason; at: number }
   | { state: "ok"; checkedAt: number }
   /** A manual config no longer matches hits; it is kept (never replaced automatically) but flagged. */
   | { state: "stale"; note: string; checkedAt: number };
 
-export type AutoDecision = { config: DamageConfig; reason: "initial" | "recalibrated" | "identity-added" } | null;
+/** "identity-changed": same hit event, identity rules added or contradicting ones removed. */
+export type AutoReason = "initial" | "recalibrated" | "identity-changed";
+export type AutoDecision = { config: DamageConfig; reason: AutoReason } | null;
 
 const ruleKey = (r: IdentityRule) => `${r.signature}|${r.nameKey}|${r.idKey}`;
 
@@ -61,13 +63,16 @@ export class AutoCalibrator {
         matching && top && isConfident(result) && !sameHealthRule(top.rule, current.health) && matching.subjectMobRows * 2 < top.subjectMobRows;
       const stillMatching = matching && !outclassed;
       if (stillMatching) {
-        // Same hit event — only learn identity rules we did not have (e.g. the join reply for your own name).
+        // Same hit event — learn identity rules we did not have (e.g. the join reply for your own name) and,
+        // for an automatic config, drop rules the traffic contradicts (they pair ids with other players' names).
         const sameAsSuggested = result.suggested && sameHealthRule(result.suggested.health, current.health);
+        const rejected = new Set(current.source === "auto" ? result.rejectedIdentity.map(ruleKey) : []);
+        const kept = current.identity.filter((r) => !rejected.has(ruleKey(r)));
         const known = new Set(current.identity.map(ruleKey));
         const extra = sameAsSuggested ? result.suggested!.identity.filter((r) => !known.has(ruleKey(r))) : [];
-        if (extra.length > 0) {
-          this.status = { state: "applied", reason: "identity-added", at: now };
-          return { config: { ...current, identity: [...current.identity, ...extra].slice(0, 10) }, reason: "identity-added" };
+        if ((extra.length > 0 || kept.length < current.identity.length) && kept.length + extra.length > 0) {
+          this.status = { state: "applied", reason: "identity-changed", at: now };
+          return { config: { ...current, identity: [...kept, ...extra].slice(0, 10) }, reason: "identity-changed" };
         }
         this.status = { state: "ok", checkedAt: now };
         return null;

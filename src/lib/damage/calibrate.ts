@@ -36,6 +36,8 @@ export type CalibrationResult = {
   namesFound: string[];
   namesMissing: string[];
   identity: IdentityCandidate[];
+  /** Identity rules whose id → name pairs contradict the others (e.g. KnockedDown: victim id + attacker name). */
+  rejectedIdentity: IdentityRule[];
   health: HealthCandidate[];
   /** Config built from the top health candidate and the identity rules whose ids it uses; null if nothing fits. */
   suggested: DamageConfig | null;
@@ -60,6 +62,44 @@ export function looksLikeCharacterName(v: string): boolean {
   return CHARACTER_NAME.test(v) && !NOT_NAMES.has(v.toLowerCase());
 }
 
+/** A candidate is dropped when more than this share of its ids already belong to someone else. */
+const MAX_CONFLICT_SHARE = 0.1;
+
+type IdentityAcc = { rule: IdentityRule; names: Set<string>; pairs: Map<number, string> };
+
+/**
+ * Some messages carry an object id next to *another* character's name: KnockedDown has the victim's id and
+ * the attacker's name, loot events the looted body and the looter. Taken as identities they credit one
+ * player's hits to another name (live traffic: a whole party merged into one row). The join reply is
+ * trusted first, then candidates with the most pairs (the spawn event names everyone in sight); a
+ * candidate whose ids mostly point at different names than the ones already established is rejected.
+ */
+function rejectConflictingIdentities(candidates: Iterable<IdentityAcc>): Set<IdentityAcc> {
+  const ordered = [...candidates].sort(
+    (a, b) =>
+      Number(b.rule.signature.startsWith("response:")) - Number(a.rule.signature.startsWith("response:")) ||
+      b.pairs.size - a.pairs.size,
+  );
+  const established = new Map<number, string>();
+  const rejected = new Set<IdentityAcc>();
+  for (const acc of ordered) {
+    let overlap = 0;
+    let conflicts = 0;
+    for (const [id, name] of acc.pairs) {
+      const known = established.get(id);
+      if (known === undefined) continue;
+      overlap++;
+      if (known.toLowerCase() !== name.toLowerCase()) conflicts++;
+    }
+    if (overlap > 0 && conflicts > overlap * MAX_CONFLICT_SHARE) {
+      rejected.add(acc);
+      continue;
+    }
+    for (const [id, name] of acc.pairs) if (!established.has(id)) established.set(id, name);
+  }
+  return rejected;
+}
+
 export function analyzeCalibration(
   messages: readonly PhotonMessage[],
   names: readonly string[] | null,
@@ -74,7 +114,7 @@ export function analyzeCalibration(
   const found = new Set<string>();
 
   // 1) Identity candidates: a string param equal to a known name + an object-id-like integer param.
-  const identity = new Map<string, { rule: IdentityRule; names: Set<string>; pairs: Map<number, string> }>();
+  const identity = new Map<string, IdentityAcc>();
   for (const m of messages) {
     for (const [nameKey, v] of m.params) {
       if (typeof v !== "string") continue;
@@ -92,6 +132,9 @@ export function analyzeCalibration(
       }
     }
   }
+
+  const rejected = rejectConflictingIdentities(identity.values());
+  for (const [key, acc] of identity) if (rejected.has(acc)) identity.delete(key);
 
   const playerIds = new Map<number, string>();
   for (const acc of identity.values()) for (const [id, name] of acc.pairs) if (!playerIds.has(id)) playerIds.set(id, name);
@@ -239,6 +282,7 @@ export function analyzeCalibration(
     namesFound: [...found].slice(0, 50),
     namesMissing: wanted ? [...wanted.values()].filter((n) => !found.has(n)) : [],
     identity: identityCandidates.slice(0, 10),
+    rejectedIdentity: [...rejected].map((a) => a.rule),
     health: healthCandidates.map((h) => h.candidate),
     suggested,
   };

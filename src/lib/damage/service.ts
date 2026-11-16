@@ -170,7 +170,7 @@ export async function ingestPackets(packets: RawPacket[]): Promise<{ accepted: n
   // but only replaces it when it has stopped matching hits altogether.
   if (svc.settings.autoCalibrate && svc.calibrator.due(localNow, current !== null)) {
     const decision = svc.calibrator.evaluate(current, localNow, svc.meter.knownIdentities());
-    if (decision) await applyConfig(svc, decision.config, decision.reason === "identity-added" ? "identities" : "full");
+    if (decision) await applyConfig(svc, decision.config, decision.reason === "identity-changed" ? "identities" : "full");
   }
   await closeIdleSession(svc, streamNow(svc, localNow));
   // An empty batch is the capture's heartbeat; the reply tells it whether to keep running.

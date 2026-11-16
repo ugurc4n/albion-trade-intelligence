@@ -1,5 +1,6 @@
+import { looksLikeCharacterName } from "./calibrate";
 import { expandRows, isIdTag, isObjectIdLike } from "./extract";
-import { EQUIPMENT_CHANGED_EVENT, mainHandFromIndex, readEquipmentItem, readJoinEquipment, readMainHand } from "./equipment";
+import { EQUIPMENT_CHANGED_EVENT, NEW_CHARACTER_EVENT, mainHandFromIndex, readEquipmentItem, readJoinEquipment, readMainHand } from "./equipment";
 import { readFameReward } from "./fame";
 import { messageSignature, type PhotonMessage } from "./photon";
 import type { DamageConfig, MainHandObservation, PlayerStats, SessionRecord } from "./types";
@@ -42,6 +43,8 @@ function autoLabel(at: number): string {
  */
 export class DamageMeter {
   private identities = new Map<number, string>();
+  /** Ids named since the last join reply (zone change): within a zone an object id keeps its first name. */
+  private zoneIds = new Set<number>();
   private equipment = new Map<number, { mainHand: MainHandObservation | null; at: number }>();
   private session: SessionRecord | null = null;
   private players = new Map<string, PlayerStats>();
@@ -157,6 +160,7 @@ export class DamageMeter {
       const id = msg.params.get(0);
       const name = msg.params.get(2);
       if (isObjectIdLike(id) && isIdTag(msg.types.get(0)) && typeof name === "string" && name.length > 0) {
+        this.zoneIds.clear();
         this.setSelf(id, name);
         this.selfEquipment = readJoinEquipment(msg);
         this.resolveSelfMainHand(msg.at);
@@ -180,12 +184,23 @@ export class DamageMeter {
       if (rule.signature !== sig) continue;
       const name = msg.params.get(rule.nameKey);
       const id = msg.params.get(rule.idKey);
-      if (typeof name === "string" && name.length > 0 && isObjectIdLike(id) && isIdTag(msg.types.get(rule.idKey))) {
-        this.learn(id, name);
-        if (msg.kind === "event" && rule.nameKey === 1) this.learnEquipment(id, readMainHand(msg, 40), msg.at);
-        // Your real name may arrive from another identity message before the next join reply.
-        if (msg.kind === "response" || (id === this.selfId && this.self === SELF_PLACEHOLDER)) this.setSelf(id, name);
+      // Guild/alliance tags and mob names are not character names (a two-letter tag once took a party's hits).
+      if (typeof name !== "string" || !looksLikeCharacterName(name) || !isObjectIdLike(id) || !isIdTag(msg.types.get(rule.idKey))) {
+        continue;
       }
+      // Your real name may arrive from another identity message before the next join reply.
+      if (msg.kind === "response" || (id === this.selfId && this.self === SELF_PLACEHOLDER)) {
+        this.setSelf(id, name);
+      } else {
+        // An id already named in this zone (or you) keeps that name unless the character spawns again: other
+        // messages pairing it with another name are look-alikes, e.g. KnockedDown carries the victim's id
+        // next to the attacker's name.
+        const known = this.identities.get(id);
+        const spawn = msg.kind === "event" && msg.code === NEW_CHARACTER_EVENT && id !== this.selfId;
+        if (!spawn && known !== undefined && known !== name && (this.zoneIds.has(id) || id === this.selfId)) continue;
+        this.learn(id, name);
+      }
+      if (msg.kind === "event" && rule.nameKey === 1) this.learnEquipment(id, readMainHand(msg, 40), msg.at);
     }
   }
 
@@ -330,6 +345,8 @@ export class DamageMeter {
   }
 
   private learn(id: number, name: string) {
+    this.zoneIds.add(id);
+    if (this.zoneIds.size > MAX_IDENTITIES) this.zoneIds.delete(this.zoneIds.keys().next().value!);
     if (this.identities.get(id) === name) return;
     // A reused object id must not lend the previous player's weapon to the new player.
     if (this.identities.has(id)) this.equipment.delete(id);
