@@ -2,9 +2,10 @@ import { looksLikeCharacterName } from "./calibrate";
 import { expandRows, isIdTag, isObjectIdLike } from "./extract";
 import { EQUIPMENT_CHANGED_EVENT, NEW_CHARACTER_EVENT, mainHandFromIndex, readEquipmentItem, readJoinEquipment, readMainHand } from "./equipment";
 import { readFameReward } from "./fame";
-import { readSilverPickup } from "./silver";
 import { messageSignature, type PhotonMessage } from "./photon";
-import type { DamageConfig, MainHandObservation, PlayerStats, SessionRecord } from "./types";
+import { readSilverPickup } from "./silver";
+import type { DamageConfig, MainHandObservation, PlayerStats, RunRecord, SessionRecord } from "./types";
+import { readBalanceUpdate, readJoinZone } from "./zone";
 
 const MAX_IDENTITIES = 5000;
 const MAX_ITEM_OBJECTS = 20_000;
@@ -31,6 +32,10 @@ const DEFAULT_OPTIONS: MeterOptions = {
 
 function emptyStats(name: string): PlayerStats {
   return { name, mainHand: null, damage: 0, heal: 0, taken: 0, hits: 0, firstAt: null, lastAt: null };
+}
+
+function newRun(zone: string | null, at: number): RunRecord {
+  return { zone, startedAt: at, endedAt: null, fame: 0, silver: 0, damage: 0 };
 }
 
 function autoLabel(at: number): string {
@@ -63,6 +68,9 @@ export class DamageMeter {
   private itemObjects = new Map<number, number>();
   /** Object ids of your equipped items from the last join reply (slot 0 = Main Hand). */
   private selfEquipment: number[] | null = null;
+  /** Current zone and own silver balance, with the stream time they were seen (replay never moves them back). */
+  private zone: { id: string; at: number } | null = null;
+  private balance: { value: number; at: number } | null = null;
 
   constructor(
     private config: DamageConfig | null = null,
@@ -112,6 +120,8 @@ export class DamageMeter {
       players: [],
       fame: null,
       silver: null,
+      runs: [newRun(this.zone?.id ?? null, now)],
+      balance: this.balance ? { start: this.balance.value, end: this.balance.value } : null,
       unattributedDamage: 0,
       configCalibratedAt: this.config?.calibratedAt ?? null,
       auto,
@@ -122,6 +132,10 @@ export class DamageMeter {
   stopSession(now: number): SessionRecord | null {
     if (!this.session) return null;
     this.session.endedAt = now;
+    // An auto session ends at its last activity: zones entered after that are not part of it.
+    const runs = this.session.runs!.filter((r, i) => i === 0 || r.startedAt <= now);
+    runs[runs.length - 1].endedAt = Math.max(now, runs[runs.length - 1].startedAt);
+    this.session.runs = runs;
     const done = this.snapshot();
     this.session = null;
     this.players = new Map();
@@ -151,6 +165,8 @@ export class DamageMeter {
       ...this.session,
       fame: this.session.fame ? { ...this.session.fame } : null,
       silver: this.session.silver ? { ...this.session.silver } : null,
+      runs: this.session.runs?.map((r) => ({ ...r })),
+      balance: this.session.balance ? { ...this.session.balance } : null,
       players: [...this.players.values()].map((p) => ({
         ...p,
         mainHand: p.mainHand ? { ...p.mainHand, item: p.mainHand.item ? { ...p.mainHand.item } : null } : null,
@@ -211,6 +227,7 @@ export class DamageMeter {
 
   handle(msg: PhotonMessage) {
     this.learnIdentities(msg);
+    this.handleZone(msg);
     this.handleFame(msg);
     this.handleSilver(msg);
     const config = this.config;
@@ -249,6 +266,7 @@ export class DamageMeter {
         const p = this.stats(causerName, Number(causer), msg.at);
         p.damage += -change;
         p.hits++;
+        this.currentRun()!.damage += -change;
         p.firstAt ??= msg.at;
         p.lastAt = msg.at;
       } else if (causerName && !self) {
@@ -287,11 +305,43 @@ export class DamageMeter {
     fame.premium += reward.premium;
     fame.satchel += reward.satchel;
     fame.events++;
+    this.currentRun()!.fame += reward.total;
     if (msg.at >= fame.lastAt) {
       fame.lastAt = msg.at;
       fame.lastBonusPercent = reward.lastBonusPercent;
     }
     this.lastActivityAt = Math.max(this.lastActivityAt ?? 0, msg.at);
+  }
+
+  /** A join reply is a zone change: it closes the current run and opens the next one. */
+  private handleZone(msg: PhotonMessage) {
+    const joined = readJoinZone(msg);
+    if (joined) {
+      if (joined.balance !== null) this.updateBalance(joined.balance, msg.at);
+      if (msg.at < (this.zone?.at ?? -Infinity)) return; // replayed older traffic
+      this.zone = { id: joined.zone, at: msg.at };
+      const run = this.currentRun();
+      if (run && msg.at > run.startedAt) {
+        run.endedAt = msg.at;
+        this.session!.runs!.push(newRun(joined.zone, msg.at));
+      }
+      return;
+    }
+    const update = readBalanceUpdate(msg);
+    if (update && update.objectId === this.selfId) this.updateBalance(update.balance, msg.at);
+  }
+
+  private updateBalance(value: number, at: number) {
+    if (at < (this.balance?.at ?? -Infinity)) return;
+    this.balance = { value, at };
+    const session = this.session;
+    if (!session || at < session.startedAt) return;
+    session.balance ??= { start: value, end: value };
+    session.balance.end = value;
+  }
+
+  private currentRun(): RunRecord | undefined {
+    return this.session?.runs?.at(-1);
   }
 
   private handleSilver(msg: PhotonMessage) {
@@ -314,6 +364,7 @@ export class DamageMeter {
     silver.tax += pickup.tax;
     silver.pickups++;
     silver.lastAt = Math.max(silver.lastAt, msg.at);
+    this.currentRun()!.silver += pickup.net;
     this.lastActivityAt = Math.max(this.lastActivityAt ?? 0, msg.at);
   }
 

@@ -88,6 +88,26 @@ export type SilverStats = {
   lastAt: number;
 };
 
+/** One stay in one zone (between two join replies) inside a session. */
+export type RunRecord = {
+  /** Zone id from the join reply: a cluster id ("3207") or an instance id ("@RANDOMDUNGEON@<guid>"); null if unknown. */
+  zone: string | null;
+  startedAt: number;
+  /** null while it is the current run of a running session. */
+  endedAt: number | null;
+  /** Own Fame and silver picked up in this run; damage by all named players. */
+  fame: number;
+  silver: number;
+  damage: number;
+};
+
+/** Own silver balance (join reply + UpdateMoney): includes trades, repairs and market, unlike SilverStats. */
+export type BalanceRecord = {
+  /** Balance when the session started, or the first one seen after it (that first change is then missed). */
+  start: number;
+  end: number;
+};
+
 export type SessionRecord = {
   id: string;
   label: string;
@@ -99,6 +119,10 @@ export type SessionRecord = {
   fame?: FameStats | null;
   /** Optional for older saved sessions. Null means no own silver pickup was captured. */
   silver?: SilverStats | null;
+  /** Optional for older saved sessions. Oldest first. */
+  runs?: RunRecord[];
+  /** Optional for older saved sessions. Null when the balance was never seen during the session. */
+  balance?: BalanceRecord | null;
   /** Damage on non-players whose causer could not be matched to a player name (pets, unseen players). */
   unattributedDamage: number;
   configCalibratedAt: string | null;
@@ -112,6 +136,8 @@ export type SessionSummary = Pick<SessionRecord, "id" | "label" | "startedAt" | 
   topPlayer: string | null;
   fame?: Pick<FameStats, "name" | "total"> | null;
   silver?: Pick<SilverStats, "name" | "net"> | null;
+  runCount?: number;
+  balanceChange?: number | null;
 };
 
 export function summarizeSession(s: SessionRecord): SessionSummary {
@@ -127,5 +153,7 @@ export function summarizeSession(s: SessionRecord): SessionSummary {
     topPlayer: sorted[0]?.damage ? sorted[0].name : null,
     fame: s.fame ? { name: s.fame.name, total: s.fame.total } : null,
     silver: s.silver ? { name: s.silver.name, net: s.silver.net } : null,
+    runCount: s.runs?.length ?? 0,
+    balanceChange: s.balance ? s.balance.end - s.balance.start : null,
   };
 }

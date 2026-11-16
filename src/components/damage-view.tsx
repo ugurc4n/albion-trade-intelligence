@@ -32,6 +32,7 @@ import { configFor } from "@/lib/damage/calibrate";
 import { damageApi, formatDuration, parseNames, type CalibrationResponse } from "@/lib/damage/client-api";
 import type { DamageState } from "@/lib/damage/service";
 import type { DamageConfig, DamageSettings, PlayerStats, SessionRecord } from "@/lib/damage/types";
+import { zoneLabel } from "@/lib/damage/zone";
 import { formatCompact, formatPercent, formatSilver } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -154,6 +155,45 @@ function FameSummary({ session, now }: { session: SessionRecord; now: number }) 
   );
 }
 
+function RunsSummary({ session, now }: { session: SessionRecord; now: number }) {
+  const runs = session.runs ?? [];
+  const balance = session.balance;
+  if (runs.length === 0 && !balance) return null;
+  const change = balance ? balance.end - balance.start : null;
+  return (
+    <div className="space-y-2.5 border-b border-border px-3 py-3 text-xs">
+      {balance && change !== null && (
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span lang="en" className="font-medium">Balance</span>
+          <span className={cn("num text-base font-semibold", change > 0 ? "text-profit" : change < 0 ? "text-loss" : "")}>
+            {change > 0 ? "+" : ""}{formatSilver(change)}
+          </span>
+          <span className="text-muted-foreground">
+            · <span className="num">{formatSilver(balance.start)}</span> → <span className="num">{formatSilver(balance.end)}</span>
+            {" "}(toplanan silver, satış, alış ve tamir dahil)
+          </span>
+        </div>
+      )}
+      {runs.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground">{runs.length} run</span>
+          {runs.map((r) => (
+            <div key={r.startedAt} className="rounded-md border border-border px-2.5 py-1.5">
+              <span lang="en" className="block font-medium">{zoneLabel(r.zone)}</span>
+              <span className="text-muted-foreground">
+                {formatDuration((r.endedAt ?? session.endedAt ?? now) - r.startedAt)}
+                {r.fame > 0 && <> · Fame <span className="num text-foreground">{formatCompact(r.fame)}</span></>}
+                {r.silver > 0 && <> · Silver <span className="num text-foreground">{formatCompact(r.silver)}</span></>}
+                {r.damage > 0 && <> · Damage <span className="num text-foreground">{formatCompact(r.damage)}</span></>}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SilverSummary({ session, now }: { session: SessionRecord; now: number }) {
   const silver = session.silver;
   if (!silver) return (
@@ -239,6 +279,7 @@ function PlayerTable({
   if (players.length === 0) {
     return (
       <>
+      <RunsSummary session={session} now={now} />
       <FameSummary session={session} now={now} />
       <SilverSummary session={session} now={now} />
       <EmptyState title={session.endedAt !== null ? "Damage kaydı yok" : "Henüz damage yok"}>
@@ -251,6 +292,7 @@ function PlayerTable({
 
   return (
     <>
+    <RunsSummary session={session} now={now} />
     <FameSummary session={session} now={now} />
     <SilverSummary session={session} now={now} />
     <div className="overflow-x-auto">
@@ -871,6 +913,10 @@ export function DamageView() {
                             Damage <span className="num text-foreground">{formatCompact(x.totalDamage)}</span>
                             {x.fame && <> · Fame <span className="num text-foreground">{formatCompact(x.fame.total)}</span></>}
                             {x.silver && <> · Silver <span className="num text-foreground">{formatCompact(x.silver.net)}</span></>}
+                            {x.balanceChange != null && x.balanceChange !== 0 && (
+                              <> · Balance <span className="num text-foreground">{x.balanceChange > 0 ? "+" : ""}{formatCompact(x.balanceChange)}</span></>
+                            )}
+                            {(x.runCount ?? 0) > 1 && <> · {x.runCount} run</>}
                             {x.topPlayer && (
                               <>
                                 {" "}
