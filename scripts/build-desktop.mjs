@@ -6,7 +6,8 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 
 const run = (cmd, args, env = {}) => {
-  const res = spawnSync(cmd, args, { stdio: "inherit", shell: process.platform === "win32", env: { ...process.env, ...env } });
+  // Only .cmd shims need a shell; through one, an unquoted "C:\Program Files\nodejs\node.exe" breaks.
+  const res = spawnSync(cmd, args, { stdio: "inherit", shell: cmd.endsWith(".cmd"), env: { ...process.env, ...env } });
   if (res.status !== 0) process.exit(res.status ?? 1);
 };
 
