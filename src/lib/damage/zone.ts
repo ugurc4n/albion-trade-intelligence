@@ -1,3 +1,4 @@
+import zoneData from "@/data/zones.json";
 import { fixedPoint, isIdTag, isObjectIdLike } from "./extract";
 import type { PhotonMessage } from "./photon";
 
@@ -46,5 +47,5 @@ export function zoneLabel(zone: string | null): string {
     const kind = instance[1];
     return INSTANCE_NAMES[kind] ?? kind.charAt(0) + kind.slice(1).toLowerCase().replace(/_/g, " ");
   }
-  return `Bölge ${zone}`;
+  return (zoneData.zones as Record<string, string>)[zone] ?? `Bölge ${zone}`;
 }

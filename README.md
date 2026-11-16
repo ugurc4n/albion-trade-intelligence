@@ -21,6 +21,7 @@ npm run dev          # http://localhost:3000
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript (strict) |
 | `npm run catalog` | Item kataloğunu ao-bin-dumps'tan yeniden üretir (`src/data/catalog.json`) |
 | `npm run avalon` | Avalon Yolları bölge verisini ao-bin-dumps'tan yeniden üretir (`src/data/avalon.json`) |
+| `npm run zones` | Bölge adlarını (damage meter run'ları için) ao-bin-dumps'tan yeniden üretir (`src/data/zones.json`) |
 | `npm run damage:simulate -- <url>` | Damage meter boru hattını oyun olmadan, **sentetik** paketlerle dener (gerçek veri değildir) |
 | `npm run smoke` | Gerçek API'ye karşı uçtan uca tarama (konsola özet basar) |
 

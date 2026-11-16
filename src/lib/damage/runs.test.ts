@@ -50,7 +50,8 @@ describe("runs", () => {
       ["3207", 100, null, 30, 0, 0],
     ]);
     expect(zoneLabel(runs[0].zone)).toBe("Random Dungeon");
-    expect(zoneLabel(runs[1].zone)).toBe("Bölge 3207");
+    expect(zoneLabel(runs[1].zone)).toBe("Blackthorn Quarry");
+    expect(zoneLabel("no-such-zone")).toBe("Bölge no-such-zone");
   });
 
   it("drops zones entered after an auto session's last activity", () => {

@@ -14,6 +14,7 @@
     "catalog": "tsx scripts/build-catalog.ts",
     "smoke": "tsx scripts/smoke.ts",
     "avalon": "tsx scripts/build-avalon.ts",
+    "zones": "tsx scripts/build-zones.ts",
     "damage:simulate": "tsx scripts/damage-simulate.ts",
     "build:desktop": "node scripts/build-desktop.mjs",
     "desktop": "electron .",
