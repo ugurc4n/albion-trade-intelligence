@@ -1,8 +1,9 @@
 import { looksLikeCharacterName } from "./calibrate";
-import { expandRows, isIdTag, isObjectIdLike } from "./extract";
+import { expandRows, isFloatTag, isIdTag, isObjectIdLike } from "./extract";
 import { EQUIPMENT_CHANGED_EVENT, NEW_CHARACTER_EVENT, mainHandFromIndex, readEquipmentItem, readJoinEquipment, readMainHand } from "./equipment";
 import { readFameReward } from "./fame";
 import { messageSignature, type PhotonMessage } from "./photon";
+import type { PhotonValue } from "./protocol18";
 import { readSilverPickup } from "./silver";
 import type { DamageConfig, MainHandObservation, PlayerStats, RunRecord, SessionRecord } from "./types";
 import { readBalanceUpdate, readJoinZone } from "./zone";
@@ -31,11 +32,42 @@ const DEFAULT_OPTIONS: MeterOptions = {
 };
 
 function emptyStats(name: string): PlayerStats {
-  return { name, mainHand: null, damage: 0, heal: 0, taken: 0, hits: 0, firstAt: null, lastAt: null };
+  return { name, mainHand: null, damage: 0, heal: 0, taken: 0, hits: 0, kills: 0, firstAt: null, lastAt: null };
 }
 
 function newRun(zone: string | null, at: number): RunRecord {
-  return { zone, startedAt: at, endedAt: null, fame: 0, silver: 0, damage: 0 };
+  return { zone, startedAt: at, endedAt: null, fame: 0, silver: 0, damage: 0, kills: 0 };
+}
+
+/**
+ * HealthUpdates, the batched form of the calibrated hit event, comes right after it in the game's event list
+ * (HealthUpdate 6, HealthUpdates 7 in the live capture): same keys, one array entry per hit.
+ */
+function isBatchedHealth(msg: PhotonMessage, healthSignature: string): boolean {
+  return msg.kind === "event" && healthSignature === `event:${msg.code - 1}`;
+}
+
+/**
+ * In batched events a list of small ids arrives as a byte array (live capture: causers [227, 227] tagged "x"),
+ * so it is read as a list like any other array.
+ */
+function withByteListsAsArrays(params: ReadonlyMap<number, PhotonValue>, keys: readonly number[]): Map<number, PhotonValue> {
+  const out = new Map(params);
+  for (const k of keys) {
+    const v = params.get(k);
+    if (v instanceof Uint8Array) out.set(k, Array.from(v));
+  }
+  return out;
+}
+
+/**
+ * The hit event's other float is the target's remaining health. The game leaves it out when it is 0, so a
+ * hit without it is the killing blow (live capture: 27 of 28 mobs; the 28th died in a batch with health 0).
+ * Returns null when the message has no such key (the remaining health is then 0).
+ */
+function remainingHealthKey(msg: PhotonMessage, changeKey: number): number | null {
+  for (const [key, tag] of msg.types) if (key !== changeKey && key < 252 && isFloatTag(tag)) return key;
+  return null;
 }
 
 function autoLabel(at: number): string {
@@ -64,6 +96,8 @@ export class DamageMeter {
   private fameCounters = new Map<string, number>();
   /** Silver pickups already counted (tick:silver object), for the same duplicate/replay protection. */
   private silverSeen = new Set<string>();
+  /** Mobs whose killing blow was counted: a mob dies once, however often the hit is replayed or repeated. */
+  private killed = new Set<number>();
   /** Item object id → item index (NewEquipmentItem); used to resolve your own Main Hand. */
   private itemObjects = new Map<number, number>();
   /** Object ids of your equipped items from the last join reply (slot 0 = Main Hand). */
@@ -235,13 +269,16 @@ export class DamageMeter {
     const sig = messageSignature(msg);
 
     const h = config.health;
-    if (h.signature !== sig) return;
-    if (Array.isArray(msg.params.get(h.changeKey)) !== Array.isArray(msg.params.get(h.causerKey))) return;
-    const keys = h.targetKey === null ? [h.causerKey, h.changeKey] : [h.causerKey, h.changeKey, h.targetKey];
-    for (const row of expandRows(msg.params, keys)) {
+    if (h.signature !== sig && !isBatchedHealth(msg, h.signature)) return;
+    const healthKey = remainingHealthKey(msg, h.changeKey);
+    const keys = [h.causerKey, h.changeKey, ...(h.targetKey === null ? [] : [h.targetKey]), ...(healthKey === null ? [] : [healthKey])];
+    const params = withByteListsAsArrays(msg.params, keys);
+    if (Array.isArray(params.get(h.changeKey)) !== Array.isArray(params.get(h.causerKey))) return;
+    for (const row of expandRows(params, keys)) {
       const causer = row.get(h.causerKey);
       const change = row.get(h.changeKey);
       const target = h.targetKey === null ? null : row.get(h.targetKey);
+      const remaining = healthKey === null ? 0 : row.get(healthKey);
       if (typeof change !== "number" || !Number.isFinite(change) || change === 0 || Math.abs(change) > MAX_SINGLE_CHANGE) continue;
 
       const causerName = isObjectIdLike(causer) ? this.identities.get(causer) : undefined;
@@ -266,7 +303,14 @@ export class DamageMeter {
         const p = this.stats(causerName, Number(causer), msg.at);
         p.damage += -change;
         p.hits++;
-        this.currentRun()!.damage += -change;
+        const run = this.currentRun()!;
+        run.damage += -change;
+        if (remaining === 0 && isObjectIdLike(target) && !this.killed.has(target)) {
+          this.killed.add(target);
+          if (this.killed.size > MAX_ITEM_OBJECTS) this.killed.delete(this.killed.keys().next().value!);
+          p.kills = (p.kills ?? 0) + 1;
+          run.kills = (run.kills ?? 0) + 1;
+        }
         p.firstAt ??= msg.at;
         p.lastAt = msg.at;
       } else if (causerName && !self) {
@@ -392,6 +436,7 @@ export class DamageMeter {
         existing.heal += old.heal;
         existing.taken += old.taken;
         existing.hits += old.hits;
+        existing.kills = (existing.kills ?? 0) + (old.kills ?? 0);
         existing.firstAt = Math.min(existing.firstAt ?? Infinity, old.firstAt ?? Infinity);
         if (!Number.isFinite(existing.firstAt)) existing.firstAt = null;
         existing.lastAt = Math.max(existing.lastAt ?? -Infinity, old.lastAt ?? -Infinity);

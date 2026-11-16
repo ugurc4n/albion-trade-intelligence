@@ -31,7 +31,7 @@ import { Switch } from "@/components/ui/switch";
 import { configFor } from "@/lib/damage/calibrate";
 import { damageApi, formatDuration, parseNames, type CalibrationResponse } from "@/lib/damage/client-api";
 import type { DamageState } from "@/lib/damage/service";
-import type { DamageConfig, DamageSettings, PlayerStats, SessionRecord } from "@/lib/damage/types";
+import { sessionKills, type DamageConfig, type DamageSettings, type PlayerStats, type SessionRecord } from "@/lib/damage/types";
 import { zoneLabel } from "@/lib/damage/zone";
 import { formatCompact, formatPercent, formatSilver } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -123,9 +123,11 @@ function FameSummary({ session, now }: { session: SessionRecord; now: number }) 
     </div>
   );
   const seconds = Math.max(1, ((session.endedAt ?? now) - session.startedAt) / 1000);
+  const kills = sessionKills(session);
   const metrics = [
     ["Total Fame", formatSilver(fame.total)],
     ["Fame/hour", formatSilver(fame.total * 3600 / seconds)],
+    ...(kills > 0 ? [["Fame/kill", formatSilver(fame.total / kills)]] : []),
     ["Fame (zone incl.)", formatSilver(fame.zoneIncluded)],
     ["Premium bonus", formatSilver(fame.premium)],
     ["Satchel bonus", formatSilver(fame.satchel)],
@@ -185,6 +187,7 @@ function RunsSummary({ session, now }: { session: SessionRecord; now: number }) 
                 {r.fame > 0 && <> · Fame <span className="num text-foreground">{formatCompact(r.fame)}</span></>}
                 {r.silver > 0 && <> · Silver <span className="num text-foreground">{formatCompact(r.silver)}</span></>}
                 {r.damage > 0 && <> · Damage <span className="num text-foreground">{formatCompact(r.damage)}</span></>}
+                {(r.kills ?? 0) > 0 && <> · Kills <span className="num text-foreground">{r.kills}</span></>}
               </span>
             </div>
           ))}
@@ -202,9 +205,11 @@ function SilverSummary({ session, now }: { session: SessionRecord; now: number }
     </div>
   );
   const seconds = Math.max(1, ((session.endedAt ?? now) - session.startedAt) / 1000);
+  const kills = sessionKills(session);
   const metrics = [
     ["Picked up", formatSilver(silver.net)],
     ["Silver/hour", formatSilver(silver.net * 3600 / seconds)],
+    ...(kills > 0 ? [["Silver/kill", formatSilver(silver.net / kills)]] : []),
     ["Before tax", formatSilver(silver.preTax)],
     ["Tax", formatSilver(silver.tax)],
     ["Pickups", String(silver.pickups)],
@@ -309,6 +314,9 @@ function PlayerTable({
             <th lang="en" className="px-3 py-2 text-right font-medium">Healing</th>
             <th lang="en" className="px-3 py-2 text-right font-medium">Damage Taken</th>
             <th lang="en" className="px-3 py-2 text-right font-medium">Hits</th>
+            <th lang="en" className="px-3 py-2 text-right font-medium">
+              <WithTip tip="Mobs this player landed the killing blow on.">Kills</WithTip>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -336,6 +344,7 @@ function PlayerTable({
                 <td className="num px-3 py-2 text-right text-profit">{p.heal > 0 ? formatSilver(p.heal) : "—"}</td>
                 <td className="num px-3 py-2 text-right text-muted-foreground">{p.taken > 0 ? formatSilver(p.taken) : "—"}</td>
                 <td className="num px-3 py-2 text-right text-muted-foreground">{p.hits}</td>
+                <td className="num px-3 py-2 text-right">{p.kills ? p.kills : "—"}</td>
               </tr>
             );
           })}
@@ -350,6 +359,9 @@ function PlayerTable({
         </span>
         <span>
           Party DPS <span className="num text-foreground">{formatSilver(total / seconds)}</span>
+        </span>
+        <span>
+          Kills <span className="num text-foreground">{players.reduce((sum, p) => sum + (p.kills ?? 0), 0)}</span>
         </span>
         {session.unattributedDamage > 0 && (
           <span title="Damage without a matched owner: pets/summons or players who entered the zone before their name was captured.">
@@ -910,6 +922,7 @@ export function DamageView() {
                           </button>
                           <span className="text-muted-foreground">
                             Damage <span className="num text-foreground">{formatCompact(x.totalDamage)}</span>
+                            {(x.kills ?? 0) > 0 && <> · Kills <span className="num text-foreground">{x.kills}</span></>}
                             {x.fame && <> · Fame <span className="num text-foreground">{formatCompact(x.fame.total)}</span></>}
                             {x.silver && <> · Silver <span className="num text-foreground">{formatCompact(x.silver.net)}</span></>}
                             {x.balanceChange != null && x.balanceChange !== 0 && (

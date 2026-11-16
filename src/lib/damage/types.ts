@@ -59,6 +59,8 @@ export type PlayerStats = {
   /** Damage taken (needs a target key in the config). */
   taken: number;
   hits: number;
+  /** Mobs this player landed the killing blow on. Optional for older saved sessions. */
+  kills?: number;
   firstAt: number | null;
   lastAt: number | null;
 };
@@ -99,6 +101,8 @@ export type RunRecord = {
   fame: number;
   silver: number;
   damage: number;
+  /** Mob kills by named players in this run. Optional for older saved sessions. */
+  kills?: number;
 };
 
 /** Own silver balance (join reply + UpdateMoney): includes trades, repairs and market, unlike SilverStats. */
@@ -138,7 +142,13 @@ export type SessionSummary = Pick<SessionRecord, "id" | "label" | "startedAt" | 
   silver?: Pick<SilverStats, "name" | "net"> | null;
   runCount?: number;
   balanceChange?: number | null;
+  kills?: number;
 };
+
+/** Mob kills by every named player in the session (the party, plus anyone else fighting nearby). */
+export function sessionKills(s: Pick<SessionRecord, "players">): number {
+  return s.players.reduce((sum, p) => sum + (p.kills ?? 0), 0);
+}
 
 export function summarizeSession(s: SessionRecord): SessionSummary {
   const sorted = [...s.players].sort((a, b) => b.damage - a.damage);
@@ -154,6 +164,7 @@ export function summarizeSession(s: SessionRecord): SessionSummary {
     fame: s.fame ? { name: s.fame.name, total: s.fame.total } : null,
     silver: s.silver ? { name: s.silver.name, net: s.silver.net } : null,
     runCount: s.runs?.length ?? 0,
+    kills: sessionKills(s),
     balanceChange: s.balance ? s.balance.end - s.balance.start : null,
   };
 }
