@@ -5,6 +5,7 @@ import path from "node:path";
 import { AutoCalibrator, type AutoCalibrationStatus } from "./auto-calibrator";
 import { launcher, type LauncherStatus } from "./capture-launcher";
 import { analyzeCalibration, type CalibrationResult } from "./calibrate";
+import { DEFAULT_HEALTH_RULE } from "./identity";
 import { DamageMeter } from "./meter";
 import { PhotonDecoder, type DecodeStats, type PhotonMessage } from "./photon";
 import {
@@ -28,8 +29,9 @@ const CONFIG_FILE = path.join(DATA_DIR, "config.json");
 const SETTINGS_FILE = path.join(DATA_DIR, "settings.json");
 
 /** Calibration recordings are short; cap them so a forgotten recording cannot eat memory. */
-const MAX_RECORDING_PACKETS = 60_000;
-const MAX_RECORDING_MS = 10 * 60_000;
+/** A 30-minute party fight is about 50,000 packets (the 10-minute party capture had 16,500). */
+const MAX_RECORDING_PACKETS = 200_000;
+const MAX_RECORDING_MS = 30 * 60_000;
 const CONNECTED_WINDOW_MS = 5_000;
 /** Bump when the shape of the service changes, so dev hot-reloads do not keep a stale singleton. */
 const SERVICE_VERSION = 7;
@@ -61,6 +63,10 @@ type DamageService = {
 };
 
 const g = globalThis as unknown as { __damageService?: DamageService };
+
+function builtInConfig(): DamageConfig {
+  return { version: 1, identity: [], health: DEFAULT_HEALTH_RULE, calibratedAt: new Date(0).toISOString(), source: "auto" };
+}
 
 function newId(now: number): string {
   return `${new Date(now).toISOString().replace(/[:.]/g, "-")}_${randomUUID().slice(0, 6)}`;
@@ -191,8 +197,10 @@ export async function ingestPackets(packets: RawPacket[]): Promise<{ accepted: n
   // A manual calibration is the user's decision: the background check may add identity rules to it,
   // but only replaces it when it has stopped matching hits altogether.
   if (svc.settings.autoCalibrate && svc.calibrator.due(localNow, current !== null)) {
-    const decision = svc.calibrator.evaluate(current, localNow, svc.meter.knownIdentities());
-    if (decision) await applyConfig(svc, decision.config, decision.reason === "identity-changed" ? "identities" : "full");
+    // Without a saved config the meter uses the built-in hit event; judge that one, so a matching default is
+    // not re-applied (and its traffic not replayed and counted twice).
+    const decision = svc.calibrator.evaluate(current ?? builtInConfig(), localNow, svc.meter.knownIdentities());
+    if (decision) await applyConfig(svc, decision.config, "full");
   }
   await closeIdleSession(svc, streamNow(svc, localNow));
   await persistRunning(svc, localNow);
@@ -273,7 +281,6 @@ export class DamageStateError extends Error {}
 export async function startSession(label: string): Promise<SessionRecord> {
   const svc = service();
   await svc.ready;
-  if (!svc.meter.getConfig() && !svc.meter.selfName) throw new DamageStateError("Waiting for damage calibration or for your character to be recognised; change zones while the capture is running.");
   if (svc.meter.snapshot()) throw new DamageStateError("A session is already running.");
   const now = streamNow(svc, Date.now());
   return svc.meter.startSession(newId(now), label.trim() || `Session ${new Date(now).toLocaleString("en-GB")}`, now);
@@ -356,8 +363,8 @@ export async function stopRecording(): Promise<{ id: string; packets: number }> 
   return { id: rec.id, packets: rec.packets.length };
 }
 
-/** Manual calibration on the last recording; with no names, character names are detected automatically. */
-export async function calibrate(names: string[]): Promise<CalibrationResult & { captureId: string; packets: number }> {
+/** Manual calibration on the last recording: candidates for the hit event. */
+export async function calibrate(): Promise<CalibrationResult & { captureId: string; packets: number }> {
   const svc = service();
   const capture = svc.lastCapture;
   if (!capture) throw new DamageStateError("Record a capture first to analyse it.");
@@ -366,7 +373,7 @@ export async function calibrate(names: string[]): Promise<CalibrationResult & { 
     const b = Buffer.from(p.d, "base64");
     return decoder.decodePacket(new Uint8Array(b.buffer, b.byteOffset, b.byteLength), p.t);
   });
-  const result = analyzeCalibration(messages, names.length > 0 ? names : null, Date.now());
+  const result = analyzeCalibration(messages, Date.now());
   return { ...result, captureId: capture.id, packets: capture.packets.length };
 }
 

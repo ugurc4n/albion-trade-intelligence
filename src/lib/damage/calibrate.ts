@@ -1,14 +1,12 @@
 /**
- * Calibration: game patches can renumber events, so instead of hard-coding codes we look at traffic where
- * someone fought something and infer:
- *   1. which messages map a player name to an object id ("identity" rules), and
- *   2. which event reports health changes caused by those object ids ("health" rule).
- * Names can be given (manual calibration) or left out (automatic: any character-name-like string is a
- * candidate, and only identities whose ids actually cause hits survive).
+ * Calibration fallback: game patches can renumber events. Player names come from the fixed, verified join
+ * reply and NewCharacter messages (see identity.ts); this only finds which event reports health changes
+ * caused by those players, so the meter keeps working if a patch moves the hit event.
  */
 import { expandRows, isFloatTag, isIdTag, isObjectIdLike } from "./extract";
+import { readJoin, readNewCharacter } from "./identity";
 import { messageSignature, type PhotonMessage } from "./photon";
-import type { DamageConfig, HealthRule, IdentityRule } from "./types";
+import type { DamageConfig, HealthRule } from "./types";
 
 const CODE_KEYS = new Set([252, 253]);
 
@@ -28,18 +26,13 @@ export type HealthCandidate = {
   sampleDamage: number[];
 };
 
-export type IdentityCandidate = { rule: IdentityRule; names: string[]; ids: number };
-
 export type CalibrationResult = {
   messageCount: number;
   eventSignatureCount: number;
-  namesFound: string[];
-  namesMissing: string[];
-  identity: IdentityCandidate[];
-  /** Identity rules whose id → name pairs contradict the others (e.g. KnockedDown: victim id + attacker name). */
-  rejectedIdentity: IdentityRule[];
+  /** Characters announced in the recording (join reply and NewCharacter). */
+  playersFound: string[];
   health: HealthCandidate[];
-  /** Config built from the top health candidate and the identity rules whose ids it uses; null if nothing fits. */
+  /** Config built from the top health candidate; null if nothing fits. */
   suggested: DamageConfig | null;
 };
 
@@ -49,106 +42,25 @@ type HealthAcc = {
   healRows: number;
   totalRows: number;
   byName: Map<string, { damage: number; heal: number; hits: number }>;
-  causerIds: Map<number, number>;
   sampleDamage: number[];
   targetKeyHits: Map<number, number>;
 };
 
-/** Albion character names: 3–16 letters/digits with at least one letter. */
-const CHARACTER_NAME = /^(?=.*[A-Za-z])[A-Za-z0-9]{3,16}$/;
-const NOT_NAMES = new Set(["system", "true", "false", "null"]);
-
-export function looksLikeCharacterName(v: string): boolean {
-  return CHARACTER_NAME.test(v) && !NOT_NAMES.has(v.toLowerCase());
-}
-
-/** A candidate is dropped when more than this share of its ids already belong to someone else. */
-const MAX_CONFLICT_SHARE = 0.1;
-
-/** `renamed`: ids this message type paired with more than one name (a character's id has one name). */
-type IdentityAcc = { rule: IdentityRule; names: Set<string>; pairs: Map<number, string>; renamed: Set<number> };
-
-/**
- * Some messages carry an object id next to *another* character's name: KnockedDown has the victim's id and
- * the attacker's name, loot events the looted body and the looter. Taken as identities they credit one
- * player's hits to another name (live traffic: a whole party merged into one row). The join reply is
- * trusted first, then candidates with the most pairs (the spawn event names everyone in sight); a
- * candidate whose ids mostly point at different names than the ones already established is rejected.
- */
-function rejectConflictingIdentities(candidates: Iterable<IdentityAcc>): Set<IdentityAcc> {
-  const ordered = [...candidates].sort(
-    (a, b) =>
-      Number(b.rule.signature.startsWith("response:")) - Number(a.rule.signature.startsWith("response:")) ||
-      b.pairs.size - a.pairs.size,
-  );
-  const established = new Map<number, string>();
-  const rejected = new Set<IdentityAcc>();
-  for (const acc of ordered) {
-    // Loot messages repeat one object id with every party member who got a share (live capture: 4 names per id).
-    if (acc.renamed.size >= 2 && acc.renamed.size > acc.pairs.size * MAX_CONFLICT_SHARE) {
-      rejected.add(acc);
-      continue;
-    }
-    let overlap = 0;
-    let conflicts = 0;
-    for (const [id, name] of acc.pairs) {
-      const known = established.get(id);
-      if (known === undefined) continue;
-      overlap++;
-      if (known.toLowerCase() !== name.toLowerCase()) conflicts++;
-    }
-    if (overlap > 0 && conflicts > overlap * MAX_CONFLICT_SHARE) {
-      rejected.add(acc);
-      continue;
-    }
-    for (const [id, name] of acc.pairs) if (!established.has(id)) established.set(id, name);
-  }
-  return rejected;
-}
-
 export function analyzeCalibration(
   messages: readonly PhotonMessage[],
-  names: readonly string[] | null,
   now: number,
   /** Ids already known from earlier traffic (e.g. the live meter), so players who joined before the window still count. */
   knownIds?: ReadonlyMap<number, string>,
 ): CalibrationResult {
-  const wanted = names
-    ? new Map(names.map((n) => [n.trim().toLowerCase(), n.trim()] as const).filter(([k]) => k.length > 0))
-    : null;
-  const nameFor = (v: string): string | undefined => (wanted ? wanted.get(v.toLowerCase()) : looksLikeCharacterName(v) ? v : undefined);
-  const found = new Set<string>();
-
-  // 1) Identity candidates: a string param equal to a known name + an object-id-like integer param.
-  const identity = new Map<string, IdentityAcc>();
-  for (const m of messages) {
-    for (const [nameKey, v] of m.params) {
-      if (typeof v !== "string") continue;
-      const display = nameFor(v);
-      if (!display) continue;
-      found.add(display);
-      for (const [idKey, id] of m.params) {
-        if (idKey === nameKey || CODE_KEYS.has(idKey) || !isIdTag(m.types.get(idKey)) || !isObjectIdLike(id)) continue;
-        const rule: IdentityRule = { signature: messageSignature(m), nameKey, idKey };
-        const key = `${rule.signature}|${nameKey}|${idKey}`;
-        let acc = identity.get(key);
-        if (!acc) identity.set(key, (acc = { rule, names: new Set(), pairs: new Map(), renamed: new Set() }));
-        acc.names.add(v);
-        const before = acc.pairs.get(id);
-        if (before !== undefined && before.toLowerCase() !== v.toLowerCase()) acc.renamed.add(id);
-        acc.pairs.set(id, v);
-      }
-    }
-  }
-
-  const rejected = rejectConflictingIdentities(identity.values());
-  for (const [key, acc] of identity) if (rejected.has(acc)) identity.delete(key);
-
   const playerIds = new Map<number, string>();
-  for (const acc of identity.values()) for (const [id, name] of acc.pairs) if (!playerIds.has(id)) playerIds.set(id, name);
+  for (const m of messages) {
+    const who = readJoin(m) ?? readNewCharacter(m);
+    if (who) playerIds.set(who.id, who.name);
+  }
+  const found = new Set(playerIds.values());
   if (knownIds) for (const [id, name] of knownIds) if (!playerIds.has(id)) playerIds.set(id, name);
 
-  // 2) Health candidates: an event with a float param and an id param that points at a known player.
+  // Health candidates: an event with a float param and an id param that points at a known player.
   const health = new Map<string, HealthAcc>();
   const eventSigs = new Set<string>();
   for (const m of messages) {
@@ -178,7 +90,6 @@ export function analyzeCalibration(
             healRows: 0,
             totalRows: 0,
             byName: new Map(),
-            causerIds: new Map(),
             sampleDamage: [],
             targetKeyHits: new Map(),
           };
@@ -191,7 +102,6 @@ export function analyzeCalibration(
           if (!isObjectIdLike(causer) || typeof change !== "number" || !Number.isFinite(change) || change === 0) continue;
           const name = playerIds.get(causer);
           if (!name) continue;
-          acc.causerIds.set(causer, (acc.causerIds.get(causer) ?? 0) + 1);
           const p = acc.byName.get(name) ?? { damage: 0, heal: 0, hits: 0 };
           if (change < 0) {
             acc.damageRows++;
@@ -246,51 +156,18 @@ export function analyzeCalibration(
           byName: [...a.byName].map(([name, v]) => ({ name, ...v })).sort((x, y) => y.damage - x.damage),
           sampleDamage: a.sampleDamage,
         } satisfies HealthCandidate,
-        causerIds: a.causerIds,
       };
     });
 
-  const identityCandidates: IdentityCandidate[] = [...identity.values()]
-    .map((a) => ({ rule: a.rule, names: [...a.names], ids: a.pairs.size }))
-    .sort((a, b) => b.names.length - a.names.length || b.ids - a.ids);
-
-  let suggested: DamageConfig | null = null;
   const top = healthCandidates[0];
-  if (top) {
-    // One identity rule per message type. The id key is the one whose ids cause the most hits; among name
-    // keys, the character name is the one that is unique per id (a guild/alliance name repeats across
-    // players), and on a tie (e.g. the join reply, which only carries you) the lowest key wins.
-    type Scored = { rule: IdentityRule; hits: number; distinct: number };
-    const best = new Map<string, Scored>();
-    const better = (a: Scored, b: Scored) =>
-      a.hits !== b.hits ? a.hits > b.hits : a.distinct !== b.distinct ? a.distinct > b.distinct : a.rule.nameKey < b.rule.nameKey;
-    for (const a of identity.values()) {
-      let hits = 0;
-      for (const id of a.pairs.keys()) hits += top.causerIds.get(id) ?? 0;
-      if (hits === 0) continue;
-      const scored: Scored = { rule: a.rule, hits, distinct: a.names.size / a.pairs.size };
-      const current = best.get(a.rule.signature);
-      if (!current || better(scored, current)) best.set(a.rule.signature, scored);
-    }
-    const rules = [...best.values()].sort((x, y) => y.hits - x.hits).map((b) => b.rule);
-    if (rules.length > 0) {
-      suggested = {
-        version: 1,
-        identity: rules.slice(0, 10),
-        health: top.candidate.rule,
-        calibratedAt: new Date(now).toISOString(),
-        source: names ? "manual" : "auto",
-      };
-    }
-  }
+  const suggested: DamageConfig | null = top
+    ? { version: 1, identity: [], health: top.candidate.rule, calibratedAt: new Date(now).toISOString(), source: "auto" }
+    : null;
 
   return {
     messageCount: messages.length,
     eventSignatureCount: eventSigs.size,
-    namesFound: [...found].slice(0, 50),
-    namesMissing: wanted ? [...wanted.values()].filter((n) => !found.has(n)) : [],
-    identity: identityCandidates.slice(0, 10),
-    rejectedIdentity: [...rejected].map((a) => a.rule),
+    playersFound: [...found].slice(0, 50),
     health: healthCandidates.map((h) => h.candidate),
     suggested,
   };
@@ -299,11 +176,7 @@ export function analyzeCalibration(
 /** Builds a config for a non-top candidate the user picked in the UI. */
 export function configFor(result: CalibrationResult, healthIndex: number, now: number): DamageConfig | null {
   const h = result.health[healthIndex];
-  if (!h || result.identity.length === 0) return null;
-  const used = new Set(h.byName.map((b) => b.name.toLowerCase()));
-  const rules = result.identity.filter((c) => c.names.some((n) => used.has(n.toLowerCase()))).map((c) => c.rule);
-  if (rules.length === 0) return null;
-  return { version: 1, identity: rules.slice(0, 10), health: h.rule, calibratedAt: new Date(now).toISOString(), source: "manual" };
+  return h ? { version: 1, identity: [], health: h.rule, calibratedAt: new Date(now).toISOString(), source: "manual" } : null;
 }
 
 /** Minimum evidence before a calibration is applied without asking. */

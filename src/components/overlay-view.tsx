@@ -90,6 +90,11 @@ export function OverlayView() {
         <>
           <ol className="min-h-0 flex-1 space-y-0.5 overflow-hidden px-1.5 py-1">
             {players.length === 0 && <li className="px-0.5 text-white/60">No damage yet.</li>}
+            {session.unattributedDamage > 0 && (
+              <li className="px-1.5 text-white/55" title="Players whose names arrive at the next zone change">
+                Unknown players <span className="num">{formatCompact(session.unattributedDamage)}</span>
+              </li>
+            )}
             {players.map((p) => {
               const self = p.name === s.capture.selfName;
               return (

@@ -5,7 +5,7 @@
  */
 import { analyzeCalibration, isConfident, sameHealthRule } from "./calibrate";
 import type { PhotonMessage } from "./photon";
-import type { DamageConfig, IdentityRule } from "./types";
+import type { DamageConfig } from "./types";
 
 const WINDOW_MS = 3 * 60_000;
 const MAX_MESSAGES = 40_000;
@@ -19,11 +19,9 @@ export type AutoCalibrationStatus =
   /** A manual config no longer matches hits; it is kept (never replaced automatically) but flagged. */
   | { state: "stale"; note: string; checkedAt: number };
 
-/** "identity-changed": same hit event, identity rules added or contradicting ones removed. */
-export type AutoReason = "initial" | "recalibrated" | "identity-changed";
+export type AutoReason = "initial" | "recalibrated";
 export type AutoDecision = { config: DamageConfig; reason: AutoReason } | null;
 
-const ruleKey = (r: IdentityRule) => `${r.signature}|${r.nameKey}|${r.idKey}`;
 
 export class AutoCalibrator {
   private buffer: PhotonMessage[] = [];
@@ -52,7 +50,7 @@ export class AutoCalibrator {
   /** Runs the analysis on the buffer and decides whether to change the config. */
   evaluate(current: DamageConfig | null, now: number, knownIds?: ReadonlyMap<number, string>): AutoDecision {
     this.lastRunAt = now;
-    const result = analyzeCalibration(this.buffer, null, now, knownIds);
+    const result = analyzeCalibration(this.buffer, now, knownIds);
     const top = result.health[0];
 
     if (current) {
@@ -63,17 +61,6 @@ export class AutoCalibrator {
         matching && top && isConfident(result) && !sameHealthRule(top.rule, current.health) && matching.subjectMobRows * 2 < top.subjectMobRows;
       const stillMatching = matching && !outclassed;
       if (stillMatching) {
-        // Same hit event — learn identity rules we did not have (e.g. the join reply for your own name) and,
-        // for an automatic config, drop rules the traffic contradicts (they pair ids with other players' names).
-        const sameAsSuggested = result.suggested && sameHealthRule(result.suggested.health, current.health);
-        const rejected = new Set(current.source === "auto" ? result.rejectedIdentity.map(ruleKey) : []);
-        const kept = current.identity.filter((r) => !rejected.has(ruleKey(r)));
-        const known = new Set(current.identity.map(ruleKey));
-        const extra = sameAsSuggested ? result.suggested!.identity.filter((r) => !known.has(ruleKey(r))) : [];
-        if ((extra.length > 0 || kept.length < current.identity.length) && kept.length + extra.length > 0) {
-          this.status = { state: "applied", reason: "identity-changed", at: now };
-          return { config: { ...current, identity: [...kept, ...extra].slice(0, 10) }, reason: "identity-changed" };
-        }
         this.status = { state: "ok", checkedAt: now };
         return null;
       }

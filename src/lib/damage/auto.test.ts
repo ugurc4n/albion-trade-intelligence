@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { buildScenario, SCENARIO_CODES, SCENARIO_PLAYERS } from "@/test/damage-scenario";
 import { eventMessage, f, l, packet, reliable } from "@/test/photon-encoder";
 import { AutoCalibrator } from "./auto-calibrator";
-import { analyzeCalibration, isConfident, looksLikeCharacterName } from "./calibrate";
+import { analyzeCalibration, isConfident } from "./calibrate";
+import { looksLikeCharacterName } from "./identity";
 import { DamageMeter } from "./meter";
 import { PhotonDecoder, type PhotonMessage } from "./photon";
 import type { DamageConfig } from "./types";
@@ -23,19 +24,19 @@ describe("character name detection", () => {
   });
 });
 
-describe("analyzeCalibration without names", () => {
+describe("analyzeCalibration", () => {
   const scenario = buildScenario();
-  const result = analyzeCalibration(decodeAll(scenario.packets), null, 0);
+  const result = analyzeCalibration(decodeAll(scenario.packets), 0);
 
   it("finds players and the hit event on its own, confidently", () => {
     expect(result.suggested?.health).toEqual({ signature: `event:${SCENARIO_CODES.health}`, causerKey: 6, changeKey: 2, targetKey: 0 });
     expect(result.suggested?.source).toBe("auto");
-    expect(result.namesFound).toEqual(expect.arrayContaining(names));
+    expect(result.playersFound).toEqual(expect.arrayContaining(names));
     expect(isConfident(result)).toBe(true);
   });
 
   it("is not confident on a handful of hits", () => {
-    const tiny = analyzeCalibration(decodeAll(buildScenario({ hits: 6 }).packets), null, 0);
+    const tiny = analyzeCalibration(decodeAll(buildScenario({ hits: 6 }).packets), 0);
     expect(isConfident(tiny)).toBe(false);
   });
 });
@@ -43,7 +44,7 @@ describe("analyzeCalibration without names", () => {
 describe("DamageMeter auto session", () => {
   const scenario = buildScenario({ seed: 3, hits: 90 });
   const messages = decodeAll(scenario.packets, 1_000_000, 100);
-  const config = analyzeCalibration(decodeAll(buildScenario().packets), null, 0).suggested!;
+  const config = analyzeCalibration(decodeAll(buildScenario().packets), 0).suggested!;
 
   it("starts on the first player hit and closes after the idle period", () => {
     const meter = new DamageMeter(config, { autoSession: true, idleMs: 60_000, newId: (at) => `auto-${at}` });
@@ -115,19 +116,13 @@ describe("AutoCalibrator", () => {
     for (const n of names) expect(byName[n]).toBeCloseTo(scenario.expected[n].damage, 3);
   });
 
-  it("keeps a working config, adds missing identity rules, and replaces a config that lost the hits", () => {
+  it("keeps a working config and replaces one that lost the hits", () => {
     const cal = new AutoCalibrator();
     cal.push(messages);
     const good = cal.evaluate(null, 0)!.config;
 
     expect(cal.evaluate(good, 1)).toBeNull();
     expect(cal.status.state).toBe("ok");
-
-    const withoutSelf: DamageConfig = { ...good, identity: good.identity.filter((r) => !r.signature.startsWith("response")) };
-    const added = cal.evaluate(withoutSelf, 2)!;
-    expect(added.reason).toBe("identity-changed");
-    expect(added.config.identity).toHaveLength(good.identity.length);
-    expect(added.config.health).toEqual(withoutSelf.health);
 
     const stale: DamageConfig = { ...good, health: { ...good.health, signature: "event:999" } };
     expect(cal.evaluate(stale, 3)?.reason).toBe("recalibrated");
@@ -147,21 +142,9 @@ describe("AutoCalibrator", () => {
   });
 });
 
-describe("identity rule selection", () => {
-  it("keeps one rule per message type and never maps a player to their guild name", () => {
-    const r = analyzeCalibration(decodeAll(buildScenario().packets), null, 0);
-    const rules = r.suggested!.identity.map((x) => `${x.signature}|${x.nameKey}|${x.idKey}`).sort();
-    expect(rules).toEqual([`event:${SCENARIO_CODES.newCharacter}|1|0`, `response:${SCENARIO_CODES.join}|2|0`]);
-    const meter = new DamageMeter(r.suggested!, { autoSession: true });
-    decodeAll(buildScenario().packets).forEach((m) => meter.handle(m));
-    expect(meter.selfName).toBe("Ugur");
-    expect(meter.snapshot()!.players.map((p) => p.name).sort()).toEqual([...names].sort());
-  });
-});
-
 describe("live-traffic look-alikes", () => {
   it("never takes a spell-cast position array for damage", () => {
-    const r = analyzeCalibration(decodeAll(buildScenario({ hits: 90 }).packets), null, 0);
+    const r = analyzeCalibration(decodeAll(buildScenario({ hits: 90 }).packets), 0);
     expect(r.health.some((h) => h.rule.signature === "event:113")).toBe(false);
     expect(r.suggested?.health.signature).toBe(`event:${SCENARIO_CODES.health}`);
   });
@@ -179,8 +162,8 @@ describe("live-traffic look-alikes", () => {
     const msgs = decodeAll(buildScenario({ hits: 60 }).packets).filter((m) => m.kind === "event" && m.code !== SCENARIO_CODES.newCharacter);
     const withoutIds = msgs.filter((m) => !(m.kind === "event" && m.code === SCENARIO_CODES.newCharacter));
     const known = new Map(SCENARIO_PLAYERS.map((p) => [p.id as number, p.name as string]));
-    expect(analyzeCalibration(withoutIds, null, 0).health[0]?.byName.length ?? 0).toBe(0);
-    const r = analyzeCalibration(withoutIds, null, 0, known);
+    expect(analyzeCalibration(withoutIds, 0).health[0]?.byName.length ?? 0).toBe(0);
+    const r = analyzeCalibration(withoutIds, 0, known);
     expect(r.health[0].rule.signature).toBe(`event:${SCENARIO_CODES.health}`);
     expect(r.health[0].byName.map((b) => b.name).sort()).toEqual([...names].sort());
   });

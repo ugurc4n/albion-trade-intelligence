@@ -19,9 +19,4 @@ export const controlBodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("capture-stop") }),
 ]);
 
-export const calibrateBodySchema = z.object({
-  /** Empty = detect character names automatically. */
-  names: z.array(z.string().trim().min(1).max(40)).max(20),
-});
-
 export type ControlBody = z.input<typeof controlBodySchema>;

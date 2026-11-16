@@ -16,13 +16,11 @@ const names = SCENARIO_PLAYERS.map((p) => p.name);
 describe("analyzeCalibration", () => {
   const scenario = buildScenario();
   const messages = decodeAll(scenario.packets);
-  const result = analyzeCalibration(messages, [...names, "Nobody"], 0);
+  const result = analyzeCalibration(messages, 0);
 
-  it("finds the identity messages for every named player and reports missing names", () => {
-    expect(result.namesFound.sort()).toEqual([...names].sort());
-    expect(result.namesMissing).toEqual(["Nobody"]);
-    const sigs = result.suggested!.identity.map((r) => `${r.signature}|${r.nameKey}|${r.idKey}`).sort();
-    expect(sigs).toEqual([`event:${SCENARIO_CODES.newCharacter}|1|0`, `response:${SCENARIO_CODES.join}|2|0`]);
+  it("knows players only from the join reply and NewCharacter, and suggests no identity rules", () => {
+    expect(result.playersFound.sort()).toEqual([...names].sort());
+    expect(result.suggested!.identity).toEqual([]);
   });
 
   it("picks the real health event over the energy look-alike and detects the target key", () => {
@@ -43,8 +41,9 @@ describe("analyzeCalibration", () => {
     expect(alt?.health.signature).toBe(result.health[1].rule.signature);
   });
 
-  it("returns no suggestion when no named player is in the recording", () => {
-    const empty = analyzeCalibration(messages, ["Stranger"], 0);
+  it("returns no suggestion when no player was announced in the recording", () => {
+    const unannounced = messages.filter((m) => !(m.kind === "response" && m.code === SCENARIO_CODES.join) && !(m.kind === "event" && m.code === SCENARIO_CODES.newCharacter));
+    const empty = analyzeCalibration(unannounced, 0);
     expect(empty.suggested).toBeNull();
     expect(empty.health).toEqual([]);
   });
@@ -53,12 +52,20 @@ describe("analyzeCalibration", () => {
 describe("DamageMeter", () => {
   const scenario = buildScenario({ seed: 11, hits: 90 });
   const messages = decodeAll(scenario.packets);
-  const config = analyzeCalibration(decodeAll(buildScenario().packets), names, 0).suggested!;
+  const config = analyzeCalibration(decodeAll(buildScenario().packets), 0).suggested!;
 
-  it("does nothing before a session starts or without a config", () => {
+  it("does nothing before a session starts", () => {
     const meter = new DamageMeter(null);
     messages.forEach((m) => meter.handle(m));
     expect(meter.snapshot()).toBeNull();
+  });
+
+  it("counts with the built-in hit event when there is no saved calibration", () => {
+    const meter = new DamageMeter(null);
+    meter.startSession("s0", "Default", 0);
+    messages.forEach((m) => meter.handle(m));
+    const byName = Object.fromEntries(meter.snapshot()!.players.map((p) => [p.name, p.damage]));
+    for (const n of names) expect(byName[n]).toBeCloseTo(scenario.expected[n].damage, 3);
   });
 
   it("sums damage dealt, healing and damage taken per player name", () => {

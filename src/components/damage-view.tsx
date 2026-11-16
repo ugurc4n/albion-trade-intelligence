@@ -370,8 +370,8 @@ function PlayerTable({
           Kills <span className="num text-foreground">{players.reduce((sum, p) => sum + (p.kills ?? 0), 0)}</span>
         </span>
         {session.unattributedDamage > 0 && (
-          <span title="Damage without a matched owner: pets/summons or players who entered the zone before their name was captured.">
-            Unattributed <span className="num text-foreground">{formatSilver(session.unattributedDamage)}</span>
+          <span title="Damage by players whose names were not announced yet (the capture started inside the zone; names arrive at the next zone change) and by pets/summons. Names are never guessed.">
+            Unknown players <span className="num text-foreground">{formatSilver(session.unattributedDamage)}</span>
           </span>
         )}
       </div>
@@ -553,17 +553,15 @@ function autoStatusText(s: DamageState): { tone: "ok" | "wait" | "off"; text: st
 
 function ManualCalibration({ recording, connected }: { recording: DamageState["recording"]; connected: boolean }) {
   const qc = useQueryClient();
-  const [names, setNames] = useState("");
   const [result, setResult] = useState<CalibrationResponse | null>(null);
   const [choice, setChoice] = useState(0);
-  const nameList = parseNames(names);
   const invalidate = () => qc.invalidateQueries({ queryKey: ["damage-state"] });
 
   const startRec = useMutation({ mutationFn: () => damageApi.control({ action: "recording-start" }), onSuccess: invalidate });
   const stopAndAnalyze = useMutation({
     mutationFn: async () => {
       await damageApi.control({ action: "recording-stop" });
-      return damageApi.calibrate(nameList);
+      return damageApi.calibrate();
     },
     onSuccess: (r) => {
       setResult(r);
@@ -588,12 +586,9 @@ function ManualCalibration({ recording, connected }: { recording: DamageState["r
   return (
     <div className="space-y-2.5 text-xs">
       <p className="text-muted-foreground">
-        Use this if automatic detection gets something wrong: record, hit a mob, and compare the candidates with the damage numbers you saw in game.
+        Only needed if a game patch moves the damage event: record while changing zones and hitting a mob, then compare the
+        candidates with the damage numbers you saw in game. Player names always come from zone entry, never from here.
       </p>
-      <label className="block space-y-1">
-        <FieldLabel>Character names (optional)</FieldLabel>
-        <Input value={names} onChange={(e) => setNames(e.target.value)} placeholder="Leave empty to detect automatically" className="h-8 text-[13px]" />
-      </label>
       {recording ? (
         <div className="flex flex-wrap items-center gap-2">
           <Pill className="border-loss/40 text-loss">
@@ -613,7 +608,7 @@ function ManualCalibration({ recording, connected }: { recording: DamageState["r
         (result.health.length === 0 ? (
           <p className="text-warn">
             No damage event found in the recording ({result.packets} packets). Make sure you change zones and hit a mob while recording.
-            {result.namesMissing.length > 0 && ` Names not seen in the recording: ${result.namesMissing.join(", ")}.`}
+            {result.playersFound.length === 0 && " No player was announced in it: start recording before changing zones."}
           </p>
         ) : (
           <div className="space-y-2">

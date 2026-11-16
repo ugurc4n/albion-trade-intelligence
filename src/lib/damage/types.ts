@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 /**
- * Which message carries "this object id belongs to this player name".
- * signature = "event:29" / "response:2" (see messageSignature).
+ * Which message carries "this object id belongs to this player name". No longer used: names come only from the
+ * verified join reply and NewCharacter (identity.ts). Kept so configs saved by older versions still load.
  */
 export const identityRuleSchema = z.object({
   signature: z.string().regex(/^(event|request|response):\d+$/),
@@ -20,7 +20,7 @@ export const healthRuleSchema = z.object({
 
 export const damageConfigSchema = z.object({
   version: z.literal(1),
-  identity: z.array(identityRuleSchema).min(1).max(10),
+  identity: z.array(identityRuleSchema).max(10).default([]),
   health: healthRuleSchema,
   calibratedAt: z.string(),
   /** "auto" = applied by the background calibrator, "manual" = confirmed by the user. */

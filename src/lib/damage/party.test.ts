@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { eventMessage, f, i, l, packet, reliable, responseMessage, s } from "@/test/photon-encoder";
-import { AutoCalibrator } from "./auto-calibrator";
-import { analyzeCalibration } from "./calibrate";
 import { DamageMeter } from "./meter";
 import { PhotonDecoder, type PhotonMessage } from "./photon";
 import type { DamageConfig } from "./types";
@@ -32,8 +30,6 @@ const PARTY = [
 ];
 const MOB = 9000;
 const GANKER_ID = 777;
-const ruleKey = (r: { signature: string; nameKey: number; idKey: number }) => `${r.signature}|${r.nameKey}|${r.idKey}`;
-const VICTIM_RULE = "event:165|3|0";
 
 function partyRun(opts: { hits: number; knockdowns: boolean; attacker?: string }) {
   const p: Uint8Array[] = [];
@@ -81,27 +77,14 @@ describe("party members keep their own names", () => {
   });
 });
 
-describe("calibration rejects identity look-alikes", () => {
-  it("drops KnockedDown (victim id + attacker name) even when the attacker has a character-like name", () => {
-    const r = analyzeCalibration(decodeAll(partyRun({ hits: 80, knockdowns: true, attacker: "Gankerx" })), null, 0);
-    expect(r.suggested!.identity.map(ruleKey).sort()).toEqual(["event:29|1|0", "response:2|2|0"]);
-    expect(r.rejectedIdentity.map(ruleKey)).toContain(VICTIM_RULE);
-  });
-
-  it("removes contradicted rules from an existing automatic config", () => {
-    const cal = new AutoCalibrator();
-    cal.push(decodeAll(partyRun({ hits: 80, knockdowns: true, attacker: "Gankerx" })));
-    const decision = cal.evaluate(savedConfig, 0)!;
-    expect(decision.reason).toBe("identity-changed");
-    expect(decision.config.identity.map(ruleKey)).toEqual(["response:2|2|0", "event:278|2|0", "event:29|1|0"]);
-    expect(decision.config.health).toEqual(savedConfig.health);
-  });
-
-  it("never removes a manual config's identity rules", () => {
-    const cal = new AutoCalibrator();
-    cal.push(decodeAll(partyRun({ hits: 80, knockdowns: true, attacker: "Gankerx" })));
-    const manual: DamageConfig = { ...savedConfig, source: "manual" };
-    const decision = cal.evaluate(manual, 0);
-    expect(decision?.config.identity.map(ruleKey) ?? manual.identity.map(ruleKey)).toContain(VICTIM_RULE);
+describe("names come only from zone entry", () => {
+  it("never learns a name from KnockedDown, Died or loot messages, whatever the saved config says", () => {
+    const meter = new DamageMeter(savedConfig, { autoSession: true, idleMs: 60_000 });
+    const d = new PhotonDecoder();
+    const send = (payload: Uint8Array) => d.decodePacket(packet([reliable(payload)]), 1).forEach((m) => meter.handle(m));
+    send(eventMessage(165, { 0: l(800), 2: l(801), 3: s("Gankerx"), 4: l(802), 5: s("Victimo") }));
+    send(eventMessage(164, { 1: l(803), 2: s("AbuSidra"), 9: l(804), 10: s("Unnamod") }));
+    send(eventMessage(278, { 0: l(805), 2: s("uk23t"), 3: { t: "o", v: true }, 5: l(2_821_988) }));
+    for (const id of [800, 801, 802, 803, 804, 805]) expect(meter.nameOf(id)).toBeUndefined();
   });
 });
