@@ -4,7 +4,7 @@ import { EQUIPMENT_CHANGED_EVENT, NEW_CHARACTER_EVENT, mainHandFromIndex, readEq
 import { readFameReward } from "./fame";
 import { messageSignature, type PhotonMessage } from "./photon";
 import type { PhotonValue } from "./protocol18";
-import { readSilverPickup } from "./silver";
+import { readSilverShare } from "./silver";
 import type { DamageConfig, MainHandObservation, PlayerStats, RunRecord, SessionRecord } from "./types";
 import { readBalanceUpdate, readJoinZone } from "./zone";
 
@@ -94,8 +94,11 @@ export class DamageMeter {
   private selfId: number | null = null;
   /** Lifetime counters prevent UDP duplicates and calibration replay from counting rewards twice. */
   private fameCounters = new Map<string, number>();
-  /** Silver pickups already counted (tick:silver object), for the same duplicate/replay protection. */
-  private silverSeen = new Set<string>();
+  /** Silver shares already counted: calibration replays the same message objects, which must not count twice. */
+  private silverCounted = new WeakSet<PhotonMessage>();
+  /** Silver received per player name in this session, and per run (yours is read by name at snapshot time). */
+  private silverByName = new Map<string, { net: number; shares: number; lastAt: number }>();
+  private runSilver = new WeakMap<RunRecord, Map<string, number>>();
   /** Mobs whose killing blow was counted: a mob dies once, however often the hit is replayed or repeated. */
   private killed = new Set<number>();
   /** Item object id → item index (NewEquipmentItem); used to resolve your own Main Hand. */
@@ -145,6 +148,7 @@ export class DamageMeter {
   startSession(id: string, label: string, now: number, auto = false): SessionRecord {
     this.players = new Map();
     this.playerEquipmentAt = new Map();
+    this.silverByName = new Map();
     this.lastActivityAt = null;
     this.session = {
       id,
@@ -174,6 +178,7 @@ export class DamageMeter {
     this.session = null;
     this.players = new Map();
     this.playerEquipmentAt = new Map();
+    this.silverByName = new Map();
     this.lastActivityAt = null;
     return done;
   }
@@ -195,11 +200,13 @@ export class DamageMeter {
 
   snapshot(): SessionRecord | null {
     if (!this.session) return null;
+    // Your silver is looked up by name, so shares received before the join reply named you still count.
+    const mine = this.self ? this.silverByName.get(this.self) : undefined;
     return {
       ...this.session,
       fame: this.session.fame ? { ...this.session.fame } : null,
-      silver: this.session.silver ? { ...this.session.silver } : null,
-      runs: this.session.runs?.map((r) => ({ ...r })),
+      silver: mine && this.self ? { name: this.self, net: mine.net, pickups: mine.shares, lastAt: mine.lastAt } : null,
+      runs: this.session.runs?.map((r) => ({ ...r, silver: (this.self && this.runSilver.get(r)?.get(this.self)) || 0 })),
       balance: this.session.balance ? { ...this.session.balance } : null,
       players: [...this.players.values()].map((p) => ({
         ...p,
@@ -243,8 +250,9 @@ export class DamageMeter {
       if (typeof name !== "string" || !looksLikeCharacterName(name) || !isObjectIdLike(id) || !isIdTag(msg.types.get(rule.idKey))) {
         continue;
       }
-      // Your real name may arrive from another identity message before the next join reply.
-      if (msg.kind === "response" || (id === this.selfId && this.self === SELF_PLACEHOLDER)) {
+      // Only the join reply names you. Event rules cannot: in a party, loot messages carry your id next to a
+      // party member's name (live capture: silver split from your kill), which once renamed you to them.
+      if (msg.kind === "response") {
         this.setSelf(id, name);
       } else {
         // An id already named in this zone (or you) keeps that name unless the character spawns again: other
@@ -327,8 +335,9 @@ export class DamageMeter {
     const reward = readFameReward(msg);
     if (!reward) return;
     // The game sends UpdateFame only for the local player, so it identifies you even when the capture
-    // started mid-zone (no join reply yet). The real name replaces the placeholder at the next join.
-    if (this.selfId === null) this.setSelf(reward.objectId, this.identities.get(reward.objectId) ?? SELF_PLACEHOLDER);
+    // started mid-zone (no join reply yet). The real name replaces the placeholder at the next join; a name
+    // learned for that id from other messages is not trusted for you.
+    if (this.selfId === null) this.setSelf(reward.objectId, SELF_PLACEHOLDER);
     if (!this.self || reward.objectId !== this.selfId) return;
     const previous = this.fameCounters.get(this.self);
     if (previous !== undefined && reward.cumulative <= previous) return;
@@ -388,27 +397,27 @@ export class DamageMeter {
     return this.session?.runs?.at(-1);
   }
 
+  /** Every player's silver share (solo: all your pickups; party: each member's cut of every pickup). */
   private handleSilver(msg: PhotonMessage) {
-    const pickup = readSilverPickup(msg);
-    // Only your own pickups: unlike UpdateFame, nothing guarantees TakeSilver is local-player only.
-    if (!pickup || !this.self || pickup.objectId !== this.selfId) return;
-    if (pickup.key !== null) {
-      if (this.silverSeen.has(pickup.key)) return;
-      this.silverSeen.add(pickup.key);
-      if (this.silverSeen.size > MAX_ITEM_OBJECTS) this.silverSeen.delete(this.silverSeen.keys().next().value!);
-    }
+    const share = readSilverShare(msg);
+    if (!share || this.silverCounted.has(msg)) return;
+    this.silverCounted.add(msg);
     if (!this.session && this.options.autoSession) {
       this.startSession(this.options.newId(msg.at), autoLabel(msg.at), msg.at, true);
     }
     const session = this.session;
-    if (!session || msg.at < session.startedAt || (session.silver && session.silver.name !== this.self)) return;
-    const silver = session.silver ??= { name: this.self, net: 0, preTax: 0, tax: 0, pickups: 0, lastAt: msg.at };
-    silver.net += pickup.net;
-    silver.preTax += pickup.preTax;
-    silver.tax += pickup.tax;
-    silver.pickups++;
-    silver.lastAt = Math.max(silver.lastAt, msg.at);
-    this.currentRun()!.silver += pickup.net;
+    if (!session || msg.at < session.startedAt) return;
+    const total = this.silverByName.get(share.name) ?? { net: 0, shares: 0, lastAt: msg.at };
+    total.net += share.amount;
+    total.shares++;
+    total.lastAt = Math.max(total.lastAt, msg.at);
+    this.silverByName.set(share.name, total);
+    const p = this.row(share.name);
+    p.silver = (p.silver ?? 0) + share.amount;
+    const run = this.currentRun()!;
+    const byName = this.runSilver.get(run) ?? new Map<string, number>();
+    byName.set(share.name, (byName.get(share.name) ?? 0) + share.amount);
+    this.runSilver.set(run, byName);
     this.lastActivityAt = Math.max(this.lastActivityAt ?? 0, msg.at);
   }
 
@@ -437,6 +446,7 @@ export class DamageMeter {
         existing.taken += old.taken;
         existing.hits += old.hits;
         existing.kills = (existing.kills ?? 0) + (old.kills ?? 0);
+        existing.silver = (existing.silver ?? 0) + (old.silver ?? 0);
         existing.firstAt = Math.min(existing.firstAt ?? Infinity, old.firstAt ?? Infinity);
         if (!Number.isFinite(existing.firstAt)) existing.firstAt = null;
         existing.lastAt = Math.max(existing.lastAt ?? -Infinity, old.lastAt ?? -Infinity);
@@ -457,7 +467,6 @@ export class DamageMeter {
       this.fameCounters.set(to, counter);
     }
     if (this.session?.fame?.name === from) this.session.fame.name = to;
-    if (this.session?.silver?.name === from) this.session.silver.name = to;
     for (const [id, n] of this.identities) if (n === from) this.identities.set(id, to);
   }
 
@@ -501,12 +510,18 @@ export class DamageMeter {
     this.playerEquipmentAt.set(player.name, at);
   }
 
-  private stats(name: string, objectId: number, at: number): PlayerStats {
+  /** A player's row without touching equipment (for data that carries a name but no object id). */
+  private row(name: string): PlayerStats {
     let p = this.players.get(name);
     if (!p) {
       p = emptyStats(name);
       this.players.set(name, p);
     }
+    return p;
+  }
+
+  private stats(name: string, objectId: number, at: number): PlayerStats {
+    const p = this.row(name);
     const equipment = this.equipment.get(objectId);
     this.applyEquipment(p, equipment?.mainHand ?? null, equipment?.at ?? at);
     return p;

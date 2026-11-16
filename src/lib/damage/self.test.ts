@@ -49,19 +49,23 @@ describe("own character", () => {
     expect(h.meter.snapshot()!.players[0].mainHand).toEqual({ item: null, observedAt: 0 });
   });
 
-  it("identifies you from your first Fame reward when the capture starts mid-zone, then uses your real name", () => {
+  it("identifies you from your first Fame reward when the capture starts mid-zone, and only the join reply names you", () => {
     const h = harness();
     h.fame(38751, 1000, 200, 10); // no join reply yet
     expect(h.meter.selfName).toBe(SELF_PLACEHOLDER);
     h.hit(38751, 90, 20);
     expect(h.meter.snapshot()!.fame).toMatchObject({ name: SELF_PLACEHOLDER, total: 200 });
-    // Your name arrives from another identity message: placeholder rows merge into it.
-    h.send(eventMessage(278, { 0: l(38751), 2: s("pesimist") }), 30);
-    h.hit(38751, 60, 40);
+    // Live party capture: silver from your kill is split, and the loot message pairs your id with a party member.
+    h.send(eventMessage(278, { 0: l(38751), 2: s("uk23t"), 3: { t: "o", v: true } }), 30);
+    h.fame(38751, 1200, 200, 35);
+    expect(h.meter.selfName).toBe(SELF_PLACEHOLDER);
+    h.join(41865, "pesimist", 0, 40); // zone change: new id, real name
+    h.fame(41865, 1400, 200, 45);
+    h.hit(41865, 60, 50);
     const snap = h.meter.snapshot()!;
     expect(h.meter.selfName).toBe("pesimist");
     expect(snap.players.map((p) => [p.name, p.damage])).toEqual([["pesimist", 150]]);
-    expect(snap.fame).toMatchObject({ name: "pesimist", total: 200 });
+    expect(snap.fame).toMatchObject({ name: "pesimist", total: 600, events: 3 });
   });
 
   it("a later join reply in a new zone renames the placeholder and keeps counting Fame", () => {

@@ -65,7 +65,8 @@ export function looksLikeCharacterName(v: string): boolean {
 /** A candidate is dropped when more than this share of its ids already belong to someone else. */
 const MAX_CONFLICT_SHARE = 0.1;
 
-type IdentityAcc = { rule: IdentityRule; names: Set<string>; pairs: Map<number, string> };
+/** `renamed`: ids this message type paired with more than one name (a character's id has one name). */
+type IdentityAcc = { rule: IdentityRule; names: Set<string>; pairs: Map<number, string>; renamed: Set<number> };
 
 /**
  * Some messages carry an object id next to *another* character's name: KnockedDown has the victim's id and
@@ -83,6 +84,11 @@ function rejectConflictingIdentities(candidates: Iterable<IdentityAcc>): Set<Ide
   const established = new Map<number, string>();
   const rejected = new Set<IdentityAcc>();
   for (const acc of ordered) {
+    // Loot messages repeat one object id with every party member who got a share (live capture: 4 names per id).
+    if (acc.renamed.size >= 2 && acc.renamed.size > acc.pairs.size * MAX_CONFLICT_SHARE) {
+      rejected.add(acc);
+      continue;
+    }
     let overlap = 0;
     let conflicts = 0;
     for (const [id, name] of acc.pairs) {
@@ -126,8 +132,10 @@ export function analyzeCalibration(
         const rule: IdentityRule = { signature: messageSignature(m), nameKey, idKey };
         const key = `${rule.signature}|${nameKey}|${idKey}`;
         let acc = identity.get(key);
-        if (!acc) identity.set(key, (acc = { rule, names: new Set(), pairs: new Map() }));
+        if (!acc) identity.set(key, (acc = { rule, names: new Set(), pairs: new Map(), renamed: new Set() }));
         acc.names.add(v);
+        const before = acc.pairs.get(id);
+        if (before !== undefined && before.toLowerCase() !== v.toLowerCase()) acc.renamed.add(id);
         acc.pairs.set(id, v);
       }
     }

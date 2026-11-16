@@ -27,9 +27,8 @@ function harness() {
   const hit = (id: number, dmg: number, at: number) => send(eventMessage(6, { 0: l(9000), 1: i(1), 2: f(-dmg), 6: l(id) }), at);
   const fame = (id: number, counter: number, gain: number, at: number) =>
     send(eventMessage(82, { 0: l(id), 1: l(counter * 10_000), 2: l(gain * 10_000) }), at);
-  let tick = 1;
   const silver = (id: number, amount: number, at: number) =>
-    send(eventMessage(62, { 0: l(id), 1: i(tick++), 2: l(500 + tick), 3: l(amount * 10_000) }), at);
+    send(eventMessage(278, { 0: l(id), 2: s("pesimist"), 3: { t: "o", v: true }, 5: l(amount * 10_000) }), at);
   const money = (id: number, balance: number, at: number) => send(eventMessage(81, { 0: l(id), 1: l(balance * 10_000) }), at);
   return { meter, send, join, hit, fame, silver, money };
 }

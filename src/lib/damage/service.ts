@@ -32,7 +32,9 @@ const MAX_RECORDING_PACKETS = 60_000;
 const MAX_RECORDING_MS = 10 * 60_000;
 const CONNECTED_WINDOW_MS = 5_000;
 /** Bump when the shape of the service changes, so dev hot-reloads do not keep a stale singleton. */
-const SERVICE_VERSION = 6;
+const SERVICE_VERSION = 7;
+/** The running session is written to disk this often, so closing the app does not lose it. */
+const PERSIST_INTERVAL_MS = 30_000;
 
 export type RawPacket = { t: number; d: string };
 
@@ -54,6 +56,8 @@ type DamageService = {
   recording: Recording | null;
   lastCapture: { id: string; packets: RawPacket[] } | null;
   lastAutoSave: { id: string; label: string; at: number } | null;
+  /** Local time the running session was last written to disk. */
+  lastPersistAt: number;
 };
 
 const g = globalThis as unknown as { __damageService?: DamageService };
@@ -83,6 +87,7 @@ function service(): DamageService {
       recording: null,
       lastCapture: null,
       lastAutoSave: null,
+      lastPersistAt: 0,
     };
     svc.ready = Promise.all([readJson(CONFIG_FILE), readJson(SETTINGS_FILE)]).then(([config, settings]) => {
       const c = damageConfigSchema.safeParse(config);
@@ -131,8 +136,25 @@ async function applyConfig(svc: DamageService, config: DamageConfig, replay: "fu
   await writeConfig(config);
 }
 
+/** Last moment anything happened in a session: what an interrupted session (app closed) is taken to end at. */
+function lastActivity(s: SessionRecord): number {
+  return Math.max(s.startedAt, s.fame?.lastAt ?? 0, s.silver?.lastAt ?? 0, ...s.players.map((p) => p.lastAt ?? 0));
+}
+
+/** Writes the running session as if it ended at its last activity; the final save overwrites it. */
+async function persistRunning(svc: DamageService, localNow: number) {
+  if (localNow - svc.lastPersistAt < PERSIST_INTERVAL_MS) return;
+  const running = svc.meter.snapshot();
+  if (!running) return;
+  svc.lastPersistAt = localNow;
+  await saveSessionFile({ ...running, endedAt: lastActivity(running) });
+}
+
 async function closeIdleSession(svc: DamageService, now: number) {
-  const { saved } = svc.meter.tick(now);
+  const runningId = svc.meter.snapshot()?.id;
+  const { saved, discarded } = svc.meter.tick(now);
+  // A session too small to keep may already have been written while it was running.
+  if (discarded && runningId) await rm(path.join(SESSIONS_DIR, `${runningId}.json`), { force: true });
   if (saved) {
     await saveSessionFile(saved);
     svc.lastAutoSave = { id: saved.id, label: saved.label, at: Date.now() };
@@ -173,6 +195,7 @@ export async function ingestPackets(packets: RawPacket[]): Promise<{ accepted: n
     if (decision) await applyConfig(svc, decision.config, decision.reason === "identity-changed" ? "identities" : "full");
   }
   await closeIdleSession(svc, streamNow(svc, localNow));
+  await persistRunning(svc, localNow);
   // An empty batch is the capture's heartbeat; the reply tells it whether to keep running.
   return { accepted: packets.length, messages: decoded.length, stop: launcher().heartbeat(localNow) };
 }
@@ -288,7 +311,9 @@ export async function listSessions(): Promise<SessionSummary[]> {
       // skip unreadable files
     }
   }
-  return out.sort((a, b) => b.startedAt - a.startedAt);
+  // The running session is shown live, not in the history (it is on disk only as a safeguard).
+  const running = g.__damageService?.meter.snapshot()?.id;
+  return out.filter((s) => s.id !== running).sort((a, b) => b.startedAt - a.startedAt);
 }
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,80}$/;

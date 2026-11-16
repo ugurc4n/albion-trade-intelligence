@@ -61,6 +61,8 @@ export type PlayerStats = {
   hits: number;
   /** Mobs this player landed the killing blow on. Optional for older saved sessions. */
   kills?: number;
+  /** Silver this player received (their party share of every pickup). Optional for older saved sessions. */
+  silver?: number;
   firstAt: number | null;
   lastAt: number | null;
 };
@@ -79,13 +81,15 @@ export type FameStats = {
   lastBonusPercent: number | null;
 };
 
-/** Own character only: silver picked up (TakeSilver), after cluster/guild tax. Not trades, repairs or sales. */
+/** Own character only: silver received from pickups (your share in a party), after tax. Not trades, repairs or sales. */
 export type SilverStats = {
   name: string;
   /** Received after taxes. */
   net: number;
-  preTax: number;
-  tax: number;
+  /** Only in sessions saved before party shares were counted (own pickups via TakeSilver). */
+  preTax?: number;
+  tax?: number;
+  /** Number of silver shares received. */
   pickups: number;
   lastAt: number;
 };

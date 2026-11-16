@@ -209,19 +209,19 @@ function SilverSummary({ session, now }: { session: SessionRecord; now: number }
   const seconds = Math.max(1, ((session.endedAt ?? now) - session.startedAt) / 1000);
   const kills = sessionKills(session);
   const metrics = [
-    ["Picked up", formatSilver(silver.net)],
+    ["Received", formatSilver(silver.net)],
     ["Silver/hour", formatSilver(silver.net * 3600 / seconds)],
     ...(kills > 0 ? [["Silver/kill", formatSilver(silver.net / kills)]] : []),
-    ["Before tax", formatSilver(silver.preTax)],
-    ["Tax", formatSilver(silver.tax)],
-    ["Pickups", String(silver.pickups)],
+    ["Shares", String(silver.pickups)],
+    // Sessions saved before party shares were counted only had your own pickups, with their tax.
+    ...(silver.tax !== undefined ? [["Tax", formatSilver(silver.tax)]] : []),
   ];
   return (
     <div className="border-b border-border bg-amber-500/5 px-3 py-3">
       <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
         <span lang="en" className="font-medium">Silver</span>
         <span className="font-medium text-amber-300">{silver.name}</span>
-        <span className="text-muted-foreground">· picked up in this session only</span>
+        <span className="text-muted-foreground">· received in this session only</span>
       </div>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 xl:grid-cols-6">
         {metrics.map(([label, value]) => (
@@ -232,8 +232,8 @@ function SilverSummary({ session, now }: { session: SessionRecord; now: number }
         ))}
       </dl>
       <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-        Picked up is the silver you received after cluster and guild tax. In a party only your own share
-        is counted. Sales, purchases and repairs are not included.
+        Received is the silver that reached your bag after tax: every pickup when solo, your share of every pickup in a party
+        (the Silver column shows each member&apos;s share). Sales, purchases and repairs are not included.
       </p>
     </div>
   );
@@ -303,7 +303,7 @@ function PlayerTable({
     <FameSummary session={session} now={now} />
     <SilverSummary session={session} now={now} />
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[840px] text-[13px]">
+      <table className="w-full min-w-[920px] text-[13px]">
         <thead>
           <tr className="border-b border-border text-left text-[11px] tracking-wide text-muted-foreground uppercase">
             <th className="px-3 py-2 font-medium">Player</th>
@@ -315,6 +315,9 @@ function PlayerTable({
             <th lang="en" className="px-3 py-2 text-right font-medium">DPS</th>
             <th lang="en" className="px-3 py-2 text-right font-medium">Healing</th>
             <th lang="en" className="px-3 py-2 text-right font-medium">Damage Taken</th>
+            <th lang="en" className="px-3 py-2 text-right font-medium">
+              <WithTip tip="Silver this player received: their share of every pickup.">Silver</WithTip>
+            </th>
             <th lang="en" className="px-3 py-2 text-right font-medium">Hits</th>
             <th lang="en" className="px-3 py-2 text-right font-medium">
               <WithTip tip="Mobs this player landed the killing blow on.">Kills</WithTip>
@@ -345,6 +348,7 @@ function PlayerTable({
                 <td className="num px-3 py-2 text-right">{formatSilver(p.damage / seconds)}</td>
                 <td className="num px-3 py-2 text-right text-profit">{p.heal > 0 ? formatSilver(p.heal) : "—"}</td>
                 <td className="num px-3 py-2 text-right text-muted-foreground">{p.taken > 0 ? formatSilver(p.taken) : "—"}</td>
+                <td className="num px-3 py-2 text-right text-amber-300">{p.silver ? formatSilver(p.silver) : "—"}</td>
                 <td className="num px-3 py-2 text-right text-muted-foreground">{p.hits}</td>
                 <td className="num px-3 py-2 text-right">{p.kills ? p.kills : "—"}</td>
               </tr>
