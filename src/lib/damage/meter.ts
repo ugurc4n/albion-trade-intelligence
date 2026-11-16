@@ -1,6 +1,7 @@
 import { expandRows, isFloatTag, isIdTag, isObjectIdLike } from "./extract";
 import { EQUIPMENT_CHANGED_EVENT, mainHandFromIndex, readEquipmentItem, readJoinEquipment, readMainHand } from "./equipment";
 import { DEFAULT_HEALTH_RULE, readJoin, readNewCharacter } from "./identity";
+import { guidOf, JOIN_GUID_KEY, NEW_CHARACTER_GUID_KEY, readPartyUpdate } from "./party";
 import { readFameReward } from "./fame";
 import { messageSignature, type PhotonMessage } from "./photon";
 import type { PhotonValue } from "./protocol18";
@@ -105,6 +106,10 @@ export class DamageMeter {
   private selfEquipment: number[] | null = null;
   /** Current zone and own silver balance, with the stream time they were seen (replay never moves them back). */
   private zone: { id: string; at: number } | null = null;
+  /** User GUIDs (stable across zones) by character name, and the party roster; null until the game sends one. */
+  private guidByName = new Map<string, string>();
+  private nameByGuid = new Map<string, string>();
+  private partyGuids: Set<string> | null = null;
   private balance: { value: number; at: number } | null = null;
 
   constructor(
@@ -205,6 +210,7 @@ export class DamageMeter {
       fame: this.session.fame ? { ...this.session.fame } : null,
       silver: mine && this.self ? { name: this.self, net: mine.net, pickups: mine.shares, lastAt: mine.lastAt } : null,
       runs: this.session.runs?.map((r) => ({ ...r, silver: (this.self && this.runSilver.get(r)?.get(this.self)) || 0 })),
+      party: this.partyNames(),
       balance: this.session.balance ? { ...this.session.balance } : null,
       players: [...this.players.values()].map((p) => ({
         ...p,
@@ -218,12 +224,14 @@ export class DamageMeter {
     // Names come only from the join reply (you) and NewCharacter (everyone else); see identity.ts.
     const self = readJoin(msg);
     if (self) {
+      this.rememberGuid(self.name, guidOf(msg.params.get(JOIN_GUID_KEY)));
       this.setSelf(self.id, self.name);
       this.selfEquipment = readJoinEquipment(msg);
       this.resolveSelfMainHand(msg.at);
     }
     const other = readNewCharacter(msg);
     if (other && other.id !== this.selfId) {
+      this.rememberGuid(other.name, guidOf(msg.params.get(NEW_CHARACTER_GUID_KEY)));
       this.learn(other.id, other.name);
       this.learnEquipment(other.id, readMainHand(msg, 40), msg.at);
     }
@@ -243,6 +251,7 @@ export class DamageMeter {
   handle(msg: PhotonMessage) {
     this.learnIdentities(msg);
     this.handleZone(msg);
+    this.handleParty(msg);
     this.handleFame(msg);
     this.handleSilver(msg);
     const sig = messageSignature(msg);
@@ -336,6 +345,42 @@ export class DamageMeter {
       fame.lastBonusPercent = reward.lastBonusPercent;
     }
     this.lastActivityAt = Math.max(this.lastActivityAt ?? 0, msg.at);
+  }
+
+  private rememberGuid(name: string, guid: string | null) {
+    if (!guid) return;
+    this.guidByName.set(name, guid);
+    this.nameByGuid.set(guid, name);
+    if (this.nameByGuid.size > MAX_IDENTITIES) this.nameByGuid.delete(this.nameByGuid.keys().next().value!);
+    if (this.guidByName.size > MAX_IDENTITIES) this.guidByName.delete(this.guidByName.keys().next().value!);
+  }
+
+  private handleParty(msg: PhotonMessage) {
+    const update = readPartyUpdate(msg);
+    if (!update) return;
+    if (update.kind === "roster") {
+      this.partyGuids = new Set(update.guids);
+      for (const [guid, name] of update.names) this.rememberGuid(name, guid);
+    } else if (update.kind === "joined") {
+      (this.partyGuids ??= new Set()).add(update.guid);
+      if (update.name) this.rememberGuid(update.name, update.guid);
+    } else if (update.kind === "left") {
+      this.partyGuids?.delete(update.guid);
+    } else {
+      this.partyGuids = new Set(); // solo again
+    }
+  }
+
+  /** Party members' names (you included), or null while the game has not said who is in the party. */
+  partyNames(): string[] | null {
+    if (!this.partyGuids) return null;
+    const names = new Set<string>();
+    for (const guid of this.partyGuids) {
+      const name = this.nameByGuid.get(guid);
+      if (name) names.add(name);
+    }
+    if (this.self) names.add(this.self);
+    return [...names];
   }
 
   /** A join reply is a zone change: it closes the current run and opens the next one. */

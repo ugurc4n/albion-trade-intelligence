@@ -45,16 +45,3 @@ export function formatDuration(ms: number): string {
   return `${h > 0 ? `${h}:` : ""}${mm}:${String(s).padStart(2, "0")}`;
 }
 
-/** Splits a free-form list ("Ugur, Ali\nVeli") into unique names. */
-export function parseNames(text: string): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const raw of text.split(/[\n,;]+/)) {
-    const n = raw.trim();
-    if (n && n.length <= 40 && !seen.has(n.toLowerCase())) {
-      seen.add(n.toLowerCase());
-      out.push(n);
-    }
-  }
-  return out.slice(0, 20);
-}

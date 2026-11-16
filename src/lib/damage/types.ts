@@ -131,6 +131,8 @@ export type SessionRecord = {
   runs?: RunRecord[];
   /** Optional for older saved sessions. Null when the balance was never seen during the session. */
   balance?: BalanceRecord | null;
+  /** Party members' names (you included) as the game reported them; null/absent when unknown. */
+  party?: string[] | null;
   /** Damage on non-players whose causer could not be matched to a player name (pets, unseen players). */
   unattributedDamage: number;
   configCalibratedAt: string | null;

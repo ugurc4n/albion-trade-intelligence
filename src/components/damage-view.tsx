@@ -17,6 +17,7 @@ import {
   Square,
   Trash2,
   UserRound,
+  UsersRound,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -30,7 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { configFor } from "@/lib/damage/calibrate";
-import { damageApi, formatDuration, parseNames, type CalibrationResponse } from "@/lib/damage/client-api";
+import { damageApi, formatDuration, type CalibrationResponse } from "@/lib/damage/client-api";
 import type { DamageState } from "@/lib/damage/service";
 import { sessionKills, type DamageConfig, type DamageSettings, type PlayerStats, type SessionRecord } from "@/lib/damage/types";
 import { zoneLabel } from "@/lib/damage/zone";
@@ -38,31 +39,12 @@ import { desktopApi, OVERLAY_LOCK_KEYS, OVERLAY_TOGGLE_KEYS } from "@/lib/deskto
 import { formatCompact, formatPercent, formatSilver } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-const NAMES_KEY = "ati.damage.names.v1";
 const CAPTURE_SOURCE = "tools/albion-capture/AlbionCapture.cs";
 const COMPILE_CMD = String.raw`C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /out:AlbionCapture.exe AlbionCapture.cs`;
 const IDLE_OPTIONS = [2, 3, 5, 10, 15];
 
 /* ---------- small helpers ---------- */
 
-function subscribeStorage(cb: () => void) {
-  window.addEventListener("storage", cb);
-  return () => window.removeEventListener("storage", cb);
-}
-function readStoredNames(): string {
-  try {
-    return window.localStorage.getItem(NAMES_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-function writeStoredNames(v: string) {
-  try {
-    window.localStorage.setItem(NAMES_KEY, v);
-  } catch {
-    // storage unavailable — names just won't be remembered
-  }
-}
 
 function CopyLine({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -264,22 +246,40 @@ function MainHandCell({ player }: { player: PlayerStats }) {
   );
 }
 
+function PartyLine({ session, partyOnly, hidden }: { session: SessionRecord; partyOnly: boolean; hidden: number }) {
+  const party = session.party ?? null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-xs text-muted-foreground">
+      <UsersRound className="size-3.5" aria-hidden />
+      {party ? (
+        <span>
+          <span lang="en" className="text-foreground">Party · {party.length}</span> {party.join(", ")}
+          {partyOnly && hidden > 0 && ` · ${hidden} other ${hidden === 1 ? "player" : "players"} hidden`}
+        </span>
+      ) : (
+        <span>Party not known yet: the game announces it at the next zone change. Everyone in view is shown until then.</span>
+      )}
+    </div>
+  );
+}
+
 function PlayerTable({
   session,
   now,
-  onlyNames,
+  partyOnly,
   selfName,
 }: {
   session: SessionRecord;
   now: number;
-  onlyNames: string[] | null;
+  /** Hide players outside the party (only when the session knows the party). */
+  partyOnly: boolean;
   selfName: string | null;
 }) {
   const end = session.endedAt ?? now;
   const seconds = Math.max(1, (end - session.startedAt) / 1000);
-  const allowed = onlyNames ? new Set(onlyNames.map((n) => n.toLowerCase())) : null;
-  if (allowed && selfName) allowed.add(selfName.toLowerCase());
-  const players: PlayerStats[] = session.players.filter((p) => !allowed || allowed.has(p.name.toLowerCase()));
+  const allowed = partyOnly && session.party ? new Set(session.party) : null;
+  const players: PlayerStats[] = session.players.filter((p) => !allowed || allowed.has(p.name));
+  const hidden = session.players.length - players.length;
   const total = players.reduce((s, p) => s + p.damage, 0);
   const top = players.reduce((m, p) => Math.max(m, p.damage), 0);
 
@@ -289,6 +289,7 @@ function PlayerTable({
       <RunsSummary session={session} now={now} />
       <FameSummary session={session} now={now} />
       <SilverSummary session={session} now={now} />
+      <PartyLine session={session} partyOnly={partyOnly} hidden={hidden} />
       <EmptyState title={session.endedAt !== null ? "No damage recorded" : "No damage yet"}>
         {session.endedAt !== null ? "No matched Damage in this session." :
           "The session is open; hits show up here as they come in. If a player's name is missing, the capture has to be running when that player enters the zone (names arrive on zone entry)."}
@@ -302,6 +303,7 @@ function PlayerTable({
     <RunsSummary session={session} now={now} />
     <FameSummary session={session} now={now} />
     <SilverSummary session={session} now={now} />
+    <PartyLine session={session} partyOnly={partyOnly} hidden={hidden} />
     <div className="overflow-x-auto">
       <table className="w-full min-w-[920px] text-[13px]">
         <thead>
@@ -764,10 +766,7 @@ function AutomationPanel({ s }: { s: DamageState }) {
 
 export function DamageView() {
   const qc = useQueryClient();
-  const stored = useSyncExternalStore(subscribeStorage, readStoredNames, () => null);
-  const [draftNames, setDraftNames] = useState<string | null>(null);
-  const names = draftNames ?? stored ?? "";
-  const [onlyParty, setOnlyParty] = useState(false);
+  const [partyOnly, setPartyOnly] = useState(true);
   const [label, setLabel] = useState("");
   const [openSession, setOpenSession] = useState<string | null>(null);
 
@@ -810,12 +809,6 @@ export function DamageView() {
   });
 
   const s = state.data;
-  const nameList = parseNames(names);
-  const partyFilter = onlyParty && nameList.length > 0 ? nameList : null;
-  const onNamesChange = (v: string) => {
-    setDraftNames(v);
-    writeStoredNames(v);
-  };
 
   return (
     <div className="pb-8">
@@ -899,7 +892,7 @@ export function DamageView() {
               </div>
               {(start.error || stop.error) && <p className="px-3 pt-2 text-xs text-loss">{(start.error ?? stop.error)!.message}</p>}
               {s!.session ? (
-                <PlayerTable session={s!.session} now={s!.now} onlyNames={partyFilter} selfName={s!.capture.selfName} />
+                <PlayerTable session={s!.session} now={s!.now} partyOnly={partyOnly} selfName={s!.capture.selfName} />
               ) : (
                 <EmptyState title="No session running">
                   {s!.lastAutoSave
@@ -908,14 +901,10 @@ export function DamageView() {
                 </EmptyState>
               )}
               <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2 text-xs">
-                <Switch checked={onlyParty} onCheckedChange={setOnlyParty} size="sm" disabled={nameList.length === 0} />
-                <span className="text-muted-foreground">Only show these names:</span>
-                <Input
-                  value={names}
-                  onChange={(e) => onNamesChange(e.target.value)}
-                  placeholder="Party members (comma-separated) — optional"
-                  className="h-7 max-w-80 min-w-48 flex-1 text-xs"
-                />
+                <Switch checked={partyOnly} onCheckedChange={setPartyOnly} size="sm" />
+                <span className="text-muted-foreground">
+                  Party only — hide other players in view (the party comes from the game itself, at every zone entry)
+                </span>
               </div>
             </Panel>
 
@@ -985,7 +974,7 @@ export function DamageView() {
                             ) : detail.isError ? (
                               <ErrorState error={detail.error} />
                             ) : (
-                              <PlayerTable session={detail.data.session} now={s!.now} onlyNames={partyFilter} selfName={s!.capture.selfName} />
+                              <PlayerTable session={detail.data.session} now={s!.now} partyOnly={partyOnly} selfName={s!.capture.selfName} />
                             )}
                           </div>
                         )}
