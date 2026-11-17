@@ -14,6 +14,21 @@ const nextConfig: NextConfig = {
         distDir: ".next-electron",
         // Trace from this folder only (stray lockfiles higher up must not move the standalone root).
         outputFileTracingRoot: process.cwd(),
+        // The damage service builds its data path from process.cwd() (used only in development), so the
+        // tracer pulls in the whole project: sources, local .data and earlier dist-electron builds nested in
+        // each other. Deep nesting pushed paths past Windows' 260-character limit and broke updates.
+        outputFileTracingExcludes: {
+          "/**": [
+            "./dist-electron/**/*",
+            "./.data/**/*",
+            "./.claude/**/*",
+            "./src/**/*",
+            "./build/**/*",
+            "./tools/**/*",
+            "./scripts/**/*",
+            "./tsconfig.json",
+          ],
+        },
       }
     : {}),
   turbopack: {

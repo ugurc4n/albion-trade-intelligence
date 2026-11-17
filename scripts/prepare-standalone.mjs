@@ -43,4 +43,11 @@ for (const required of ["server.js", path.join("node_modules", "next", "package.
     process.exit(1);
   }
 }
+// Project folders must never ship: local data is private, and nested builds exceed Windows' path limit.
+for (const forbidden of ["dist-electron", ".data", ".claude", "src", "tools", "scripts", "electron"]) {
+  if (existsSync(path.join(standalone, forbidden))) {
+    console.error(`Standalone output must not contain ${forbidden}/ (check outputFileTracingExcludes in next.config.ts).`);
+    process.exit(1);
+  }
+}
 console.log(`Standalone server ready at ${path.relative(root, standalone)} (${replaced} symlink(s) replaced by copies).`);
