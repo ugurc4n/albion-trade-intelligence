@@ -7,36 +7,42 @@ import {
   ChevronRight,
   Circle,
   CircleDot,
+  Coins,
   Copy,
   Crosshair,
   History,
   Loader2,
   PictureInPicture2,
   Play,
+  Settings2,
   ShieldCheck,
   Square,
+  Swords,
   Trash2,
   UserRound,
-  UsersRound,
   Wifi,
   WifiOff,
+  X,
 } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Pill, TierBadge, WithTip } from "@/components/badges";
-import { FieldLabel, NativeSelect } from "@/components/filters-bar";
-import { ItemIcon } from "@/components/item-icon";
+import { Pill } from "@/components/badges";
+import { PlayerTable } from "@/components/damage-player-table";
+import { NativeSelect } from "@/components/filters-bar";
 import { PageHeader, Panel } from "@/components/page-parts";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { configFor } from "@/lib/damage/calibrate";
 import { damageApi, formatDuration, type CalibrationResponse } from "@/lib/damage/client-api";
+import { playerRanking, sessionSeconds } from "@/lib/damage/presentation";
 import type { DamageState } from "@/lib/damage/service";
-import { sessionKills, type DamageConfig, type DamageSettings, type PlayerStats, type SessionRecord } from "@/lib/damage/types";
+import { sessionKills, type DamageConfig, type DamageSettings, type SessionRecord } from "@/lib/damage/types";
 import { zoneLabel } from "@/lib/damage/zone";
 import { desktopApi, OVERLAY_LOCK_KEYS, OVERLAY_TOGGLE_KEYS } from "@/lib/desktop";
-import { formatCompact, formatPercent, formatSilver } from "@/lib/format";
+import { formatCompact, formatSilver } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const CAPTURE_SOURCE = "tools/albion-capture/AlbionCapture.cs";
@@ -221,167 +227,6 @@ function SilverSummary({ session, now }: { session: SessionRecord; now: number }
   );
 }
 
-function MainHandCell({ player }: { player: PlayerStats }) {
-  const observation = player.mainHand;
-  if (!observation) {
-    return (
-      <span
-        className="cursor-help text-xs text-muted-foreground underline decoration-dotted underline-offset-2"
-        title="The Main Hand is learned when a player enters the zone or changes equipment. Change zones once after starting the capture."
-      >
-        Unknown
-      </span>
-    );
-  }
-  const item = observation.item;
-  if (!item) return <span lang="en" className="text-xs text-muted-foreground">Unarmed</span>;
-  return (
-    <div className="flex items-center gap-2" title={`Last seen Main Hand: ${item.nameEn} · T${item.tier}.${item.enchant}`}>
-      <ItemIcon key={item.id} itemId={item.id} size={28} />
-      <div className="min-w-0">
-        <span lang="en" className="block max-w-44 truncate text-xs">{item.nameEn}</span>
-        <TierBadge tier={item.tier} enchant={item.enchant} />
-      </div>
-    </div>
-  );
-}
-
-function PartyLine({ session, partyOnly, hidden }: { session: SessionRecord; partyOnly: boolean; hidden: number }) {
-  const party = session.party ?? null;
-  return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-xs text-muted-foreground">
-      <UsersRound className="size-3.5" aria-hidden />
-      {party ? (
-        <span>
-          <span lang="en" className="text-foreground">Party · {party.length}</span> {party.join(", ")}
-          {partyOnly && hidden > 0 && ` · ${hidden} other ${hidden === 1 ? "player" : "players"} hidden`}
-        </span>
-      ) : (
-        <span>Party not known yet: the game announces it at the next zone change. Everyone in view is shown until then.</span>
-      )}
-    </div>
-  );
-}
-
-function PlayerTable({
-  session,
-  now,
-  partyOnly,
-  selfName,
-}: {
-  session: SessionRecord;
-  now: number;
-  /** Hide players outside the party (only when the session knows the party). */
-  partyOnly: boolean;
-  selfName: string | null;
-}) {
-  const end = session.endedAt ?? now;
-  const seconds = Math.max(1, (end - session.startedAt) / 1000);
-  const allowed = partyOnly && session.party ? new Set(session.party) : null;
-  const players: PlayerStats[] = session.players.filter((p) => !allowed || allowed.has(p.name));
-  const hidden = session.players.length - players.length;
-  const total = players.reduce((s, p) => s + p.damage, 0);
-  const top = players.reduce((m, p) => Math.max(m, p.damage), 0);
-
-  if (players.length === 0) {
-    return (
-      <>
-      <RunsSummary session={session} now={now} />
-      <FameSummary session={session} now={now} />
-      <SilverSummary session={session} now={now} />
-      <PartyLine session={session} partyOnly={partyOnly} hidden={hidden} />
-      <EmptyState title={session.endedAt !== null ? "No damage recorded" : "No damage yet"}>
-        {session.endedAt !== null ? "No matched Damage in this session." :
-          "The session is open; hits show up here as they come in. If a player's name is missing, the capture has to be running when that player enters the zone (names arrive on zone entry)."}
-      </EmptyState>
-      </>
-    );
-  }
-
-  return (
-    <>
-    <RunsSummary session={session} now={now} />
-    <FameSummary session={session} now={now} />
-    <SilverSummary session={session} now={now} />
-    <PartyLine session={session} partyOnly={partyOnly} hidden={hidden} />
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[920px] text-[13px]">
-        <thead>
-          <tr className="border-b border-border text-left text-[11px] tracking-wide text-muted-foreground uppercase">
-            <th className="px-3 py-2 font-medium">Player</th>
-            <th lang="en" className="px-3 py-2 font-medium">
-              <WithTip tip="Last seen Main Hand. Updated whenever an equipment packet arrives.">Main Hand</WithTip>
-            </th>
-            <th lang="en" className="px-3 py-2 text-right font-medium">Damage</th>
-            <th className="w-[28%] px-3 py-2 font-medium">Share</th>
-            <th lang="en" className="px-3 py-2 text-right font-medium">DPS</th>
-            <th lang="en" className="px-3 py-2 text-right font-medium">Healing</th>
-            <th lang="en" className="px-3 py-2 text-right font-medium">Damage Taken</th>
-            <th lang="en" className="px-3 py-2 text-right font-medium">
-              <WithTip tip="Silver this player received: their share of every pickup.">Silver</WithTip>
-            </th>
-            <th lang="en" className="px-3 py-2 text-right font-medium">Hits</th>
-            <th lang="en" className="px-3 py-2 text-right font-medium">
-              <WithTip tip="Mobs this player landed the killing blow on.">Kills</WithTip>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {players.map((p, idx) => {
-            const share = total > 0 ? p.damage / total : 0;
-            const isSelf = selfName !== null && p.name === selfName;
-            return (
-              <tr key={p.name} className={cn("border-b border-border/60 last:border-0", isSelf && "bg-fuchsia-500/8")}>
-                <td className="px-3 py-2">
-                  <span className="num mr-2 text-muted-foreground">{idx + 1}</span>
-                  <span className="font-medium">{p.name}</span>
-                  {isSelf && <span className="ml-1.5 text-[11px] text-fuchsia-300">you</span>}
-                </td>
-                <td className="px-3 py-2"><MainHandCell player={p} /></td>
-                <td className="num px-3 py-2 text-right">{formatSilver(p.damage)}</td>
-                <td className="px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-fuchsia-400" style={{ width: `${top > 0 ? (p.damage / top) * 100 : 0}%` }} />
-                    </div>
-                    <span className="num w-12 text-right text-xs text-muted-foreground">{formatPercent(share)}</span>
-                  </div>
-                </td>
-                <td className="num px-3 py-2 text-right">{formatSilver(p.damage / seconds)}</td>
-                <td className="num px-3 py-2 text-right text-profit">{p.heal > 0 ? formatSilver(p.heal) : "—"}</td>
-                <td className="num px-3 py-2 text-right text-muted-foreground">{p.taken > 0 ? formatSilver(p.taken) : "—"}</td>
-                <td className="num px-3 py-2 text-right text-amber-300">{p.silver ? formatSilver(p.silver) : "—"}</td>
-                <td className="num px-3 py-2 text-right text-muted-foreground">{p.hits}</td>
-                <td className="num px-3 py-2 text-right">{p.kills ? p.kills : "—"}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border px-3 py-2 text-xs text-muted-foreground">
-        <span>
-          Duration <span className="num text-foreground">{formatDuration(end - session.startedAt)}</span>
-        </span>
-        <span>
-          Total Damage <span className="num text-foreground">{formatSilver(total)}</span>
-        </span>
-        <span>
-          Party DPS <span className="num text-foreground">{formatSilver(total / seconds)}</span>
-        </span>
-        <span>
-          Kills <span className="num text-foreground">{players.reduce((sum, p) => sum + (p.kills ?? 0), 0)}</span>
-        </span>
-        {session.unattributedDamage > 0 && (
-          <span title="Damage by players whose names were not announced yet (the capture started inside the zone; names arrive at the next zone change) and by pets/summons. Names are never guessed.">
-            Unknown players <span className="num text-foreground">{formatSilver(session.unattributedDamage)}</span>
-          </span>
-        )}
-      </div>
-    </div>
-    </>
-  );
-}
-
 /* ---------- connection ---------- */
 
 const LAUNCHER_TEXT: Record<DamageState["launcher"]["state"], string> = {
@@ -393,7 +238,7 @@ const LAUNCHER_TEXT: Record<DamageState["launcher"]["state"], string> = {
   error: "Could not start",
 };
 
-/** Desktop app: one big Start/Stop button instead of terminal instructions. */
+/** Desktop app: one Start/Stop button for the capture instead of terminal instructions. */
 function LauncherControl({ s }: { s: DamageState }) {
   const qc = useQueryClient();
   const l = s.launcher;
@@ -401,30 +246,16 @@ function LauncherControl({ s }: { s: DamageState }) {
   const start = useMutation({ mutationFn: () => damageApi.control({ action: "capture-start" }), onSuccess: invalidate });
   const stop = useMutation({ mutationFn: () => damageApi.control({ action: "capture-stop" }), onSuccess: invalidate });
   const active = l.state === "running" || l.state === "starting";
-  const busy = start.isPending || stop.isPending || l.state === "stopping";
+  const busy = start.isPending || stop.isPending || l.state === "starting" || l.state === "stopping";
   const error = start.error ?? stop.error;
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-fuchsia-400/25 bg-fuchsia-500/8 p-3">
-      {active ? (
-        <Button size="lg" variant="outline" onClick={() => stop.mutate()} disabled={busy} className="min-w-36">
-          {busy ? <Loader2 className="animate-spin" /> : <Square />} Stop
-        </Button>
-      ) : (
-        <Button size="lg" onClick={() => start.mutate()} disabled={busy} className="min-w-36 bg-fuchsia-500 text-white hover:bg-fuchsia-400">
-          {busy ? <Loader2 className="animate-spin" /> : <Play />} Start
-        </Button>
-      )}
-      <div className="min-w-0 flex-1 text-xs leading-relaxed">
-        <p className="font-medium">{LAUNCHER_TEXT[l.state]}</p>
-        <p className="text-muted-foreground">
-          {l.message ??
-            (l.state === "running"
-              ? "Reading game traffic. It stops by itself when you close the app."
-              : "Click Start; Windows asks for permission once — choose “Yes”.")}
-        </p>
-        {error && <p className="text-loss">{error.message}</p>}
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      <Button variant={active ? "outline" : "default"} onClick={() => (active ? stop.mutate() : start.mutate())} disabled={busy}>
+        {busy ? <Loader2 className="animate-spin" /> : active ? <Square /> : <Play />}
+        {l.state === "starting" ? "Starting…" : l.state === "stopping" ? "Stopping…" : active ? "Stop tracking" : "Start tracking"}
+      </Button>
+      {error && <p role="alert" className="max-w-sm text-xs text-loss">{error.message}</p>}
     </div>
   );
 }
@@ -432,8 +263,8 @@ function LauncherControl({ s }: { s: DamageState }) {
 /** The desktop bridge is there from the first render and never changes. */
 const subscribeNothing = () => () => {};
 
-/** Desktop app only: shows or hides the always-on-top in-game overlay. */
-function OverlayControl() {
+/** Desktop app only: whether the always-on-top in-game overlay exists and is open. */
+function useOverlay() {
   const available = useSyncExternalStore(subscribeNothing, () => desktopApi() !== null, () => false);
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -442,6 +273,22 @@ function OverlayControl() {
     void api.overlay.isOpen().then(setOpen);
     return api.overlay.onOpenChange(setOpen);
   }, []);
+  return { available, open };
+}
+
+function OverlayButton() {
+  const { available, open } = useOverlay();
+  if (!available) return null;
+  return (
+    <Button variant="ghost" onClick={() => desktopApi()?.overlay.toggle()} title={`${OVERLAY_TOGGLE_KEYS} shows or hides it, ${OVERLAY_LOCK_KEYS} locks it`}>
+      <PictureInPicture2 /> {open ? "Hide overlay" : "Show overlay"}
+    </Button>
+  );
+}
+
+/** Desktop app only: the overlay toggle with its explanation, for the settings sheet. */
+function OverlayControl() {
+  const { available, open } = useOverlay();
   if (!available) return null;
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3">
@@ -498,7 +345,6 @@ function ConnectionPanel({ s }: { s: DamageState }) {
             <dd className="num">{c.decode.errors + c.decode.encrypted}</dd>
           </div>
         </dl>
-        {desktop && <LauncherControl s={s} />}
         <OverlayControl />
         {!desktop && (
           <Disclosure title="Setup (Windows)" defaultOpen={!c.connected && c.packetsReceived === 0}>
@@ -762,12 +608,35 @@ function AutomationPanel({ s }: { s: DamageState }) {
   );
 }
 
+function TrackingNotice({ s, onSettings }: { s: DamageState; onSettings: () => void }) {
+  const failed = s.launcher.available && (s.launcher.state === "error" || s.launcher.state === "denied");
+  const closed = s.launcher.available && s.launcher.state === "idle" && !s.capture.connected;
+  let message: string | null = null;
+  if (failed) message = s.launcher.message ?? "The capture could not start. Start tracking again or check the connection settings.";
+  else if (closed) message = "Tracking is off. Start tracking; Windows may ask for administrator permission.";
+  else if (!s.capture.connected) message = s.capture.lastPacketAt
+    ? "The data stream stopped. Check that the game is open and the capture is running."
+    : "Waiting for game data. Open Albion Online and change zones while the capture is running.";
+  else if (!s.config || s.auto.state === "stale") message = autoStatusText(s).text;
+  else if (!s.capture.selfName) message = "Change zones while the capture is running to recognise your character. The damage ranking already works.";
+  if (!message) return null;
+  const action = !s.launcher.available || failed || (s.capture.connected && !s.config && !s.settings.autoCalibrate);
+  return (
+    <div role="status" className={cn("flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm", failed ? "border-loss/30 text-loss" : "border-warn/25 text-muted-foreground")}>
+      <span>{message}</span>
+      {action && <Button variant="ghost" size="sm" onClick={onSettings}>{!s.launcher.available ? "Connection setup" : "Open settings"}</Button>}
+    </div>
+  );
+}
+
 /* ---------- main view ---------- */
 
 export function DamageView() {
   const qc = useQueryClient();
   const [partyOnly, setPartyOnly] = useState(true);
   const [label, setLabel] = useState("");
+  const [tab, setTab] = useState<string>("live");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [openSession, setOpenSession] = useState<string | null>(null);
 
   const state = useQuery({
@@ -797,6 +666,7 @@ export function DamageView() {
     onSuccess: (r) => {
       setLabel("");
       setOpenSession(r.session.id);
+      setTab("history");
       refresh();
     },
   });
@@ -809,190 +679,244 @@ export function DamageView() {
   });
 
   const s = state.data;
+  const session = s?.session;
+  const visible = session ? playerRanking(session, "damage", partyOnly && session.party ? session.party : null) : null;
+  const seconds = session && s ? sessionSeconds(session, s.now) : 1;
+  const self = session?.players.find((p) => s?.capture.selfName && p.name.toLowerCase() === s.capture.selfName.toLowerCase());
+  const filters = (
+    <label className="flex items-center gap-2 text-sm" title="Hide other players in view. The party comes from the game itself, at every zone entry.">
+      <Switch checked={partyOnly} onCheckedChange={setPartyOnly} size="sm" />
+      Party only
+    </label>
+  );
 
   return (
     <div className="pb-8">
-      <PageHeader section="damage"
-        title="Damage Meter"
-        description="Damage, Healing and Damage Taken for the party; Fame, silver and runs for your own character. A session starts on the first hit or your own Fame reward."
-      />
+      <PageHeader section="damage" title="Damage Meter" description="Track your live performance and the player ranking." />
       <div className="space-y-3 px-3 lg:px-4">
-        <div className="flex gap-2.5 rounded-lg border border-border bg-card p-3 text-xs leading-relaxed">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-          <p className="text-muted-foreground">
-            The capture only reads packets the game <span className="text-foreground">receives</span> and forwards them to this app; the data stays
-            on this computer. Sandbox Interactive is known to tolerate read-only tools, but that is not an official guarantee; use it at
-            your own risk.
-          </p>
-        </div>
-
-        {state.isPending ? (
-          <Panel>
-            <TableSkeleton rows={4} />
-          </Panel>
-        ) : state.isError ? (
-          <Panel>
-            <ErrorState error={state.error} onRetry={() => void state.refetch()} />
-          </Panel>
-        ) : (
+        {state.isPending ? <Panel><TableSkeleton rows={5} /></Panel> : state.isError ? (
+          <Panel><ErrorState title="Could not load Damage Meter data" error={state.error} onRetry={() => void state.refetch()} /></Panel>
+        ) : s ? (
           <>
-            <div className="grid gap-3 xl:grid-cols-2">
-              <AutomationPanel s={s!} />
-              <ConnectionPanel s={s!} />
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                <span className="flex items-center gap-1.5">
+                  {s.capture.connected ? <Wifi className="size-4 text-profit" /> : <WifiOff className="size-4 text-warn" />}
+                  {s.capture.connected ? "Receiving data" : s.capture.lastPacketAt ? "Data stream stopped" : "Waiting for game data"}
+                </span>
+                <span className="text-xs text-muted-foreground">Capture: {s.launcher.available ? LAUNCHER_TEXT[s.launcher.state] : "External"}</span>
+                {s.capture.selfName && <span className="flex items-center gap-1.5 text-fuchsia-300"><UserRound className="size-3.5" />{s.capture.selfName}</span>}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {s.launcher.available && <LauncherControl s={s} />}
+                <OverlayButton />
+                <Button variant="ghost" onClick={() => setSettingsOpen(true)}><Settings2 />Settings</Button>
+              </div>
             </div>
+            <TrackingNotice s={s} onSettings={() => setSettingsOpen(true)} />
 
-            <Panel
-              title={
-                <span className="flex items-center gap-2">
-                  <Play className="size-4 text-muted-foreground" /> Session
-                  {s!.session && (
-                    <Pill className="border-loss/40 text-loss">
-                      <CircleDot className="size-3 animate-pulse" /> {s!.session.auto ? "Auto" : "Live"} ·{" "}
-                      <span className="num">{formatDuration(s!.now - s!.session.startedAt)}</span>
-                    </Pill>
+            <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
+              <SheetContent showCloseButton={false} className="w-full gap-4 overflow-y-auto p-4 sm:max-w-xl [&>*]:shrink-0">
+                <SheetClose className="absolute top-3 right-3 rounded-md p-2 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+                  <X className="size-4" /><span className="sr-only">Close settings</span>
+                </SheetClose>
+                <div className="pr-9">
+                  <SheetTitle>Damage Meter settings</SheetTitle>
+                  <SheetDescription>Automation, connection, overlay and advanced calibration.</SheetDescription>
+                </div>
+                <AutomationPanel s={s} />
+                <ConnectionPanel s={s} />
+                <div className="flex gap-2 rounded-lg border border-border p-3 text-xs leading-relaxed text-muted-foreground">
+                  <ShieldCheck className="size-4 shrink-0 text-primary" />
+                  <p>The capture only reads packets the game receives and forwards them to this app; the data stays on this computer.
+                    Sandbox Interactive is known to tolerate read-only tools, but that is not an official guarantee; use it at your own risk.</p>
+                </div>
+                <Disclosure title="What is measured and how">
+                  <p className="text-xs leading-relaxed text-muted-foreground">Numbers are the events received by the client running the capture:
+                    hits by party members out of view range may be missing. Pet/summon damage is shown separately as unknown players.
+                    Self-healing and PvP damage are not counted in the Damage total. Healing may include overhealing. Very short auto sessions
+                    (fewer than 10 hits) without a Fame reward or silver pickup are not saved. Main Hand is the last seen equipment;
+                    Damage is not split by weapon.</p>
+                </Disclosure>
+              </SheetContent>
+            </Sheet>
+
+            <Tabs value={tab} onValueChange={(value) => setTab(String(value))} className="gap-3">
+              <TabsList className="h-10 w-full sm:w-fit">
+                <TabsTrigger value="live" className="px-5"><Swords />Live</TabsTrigger>
+                <TabsTrigger value="earnings" className="px-5"><Coins />Earnings</TabsTrigger>
+                <TabsTrigger value="history" className="px-5"><History />History</TabsTrigger>
+              </TabsList>
+              <TabsContent value="live" className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
+                  {session ? (
+                    <>
+                      <div className="min-w-0">
+                        <p className="flex flex-wrap items-center gap-2 font-medium">
+                          <span className="truncate">{session.label}</span>
+                          <Pill className="border-profit/30 text-profit"><CircleDot className="size-3" />{session.auto ? "Auto" : "Live"}</Pill>
+                          <span className="num text-sm text-muted-foreground">{formatDuration(s.now - session.startedAt)}</span>
+                        </p>
+                        {session.auto && <p className="mt-1 text-xs text-muted-foreground">Saved automatically after {s.settings.idleMinutes} min without activity.</p>}
+                      </div>
+                      <Button variant="outline" onClick={() => stop.mutate()} disabled={stop.isPending}>
+                        {stop.isPending ? <Loader2 className="animate-spin" /> : <Square />}End and save session
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        {s.settings.autoSession ? "A session starts by itself on the first hit or your own Fame reward." : "Auto session is off; start one manually."}
+                      </p>
+                      <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+                        <Input aria-label="Session name (optional)" value={label} onChange={(e) => setLabel(e.target.value)}
+                          placeholder="Session name (optional)" maxLength={80} className="w-full sm:w-56" />
+                        <Button variant="outline" onClick={() => start.mutate()} disabled={start.isPending || (!s.config && !s.capture.selfName)}>
+                          {start.isPending ? <Loader2 className="animate-spin" /> : <Play />}Start manually
+                        </Button>
+                      </div>
+                    </>
                   )}
-                </span>
-              }
-            >
-              <div className="flex flex-wrap items-end gap-2 border-b border-border p-3">
-                {s!.session ? (
-                  <>
-                    <p className="mr-auto text-xs text-muted-foreground">
-                      <span className="text-foreground">{s!.session.label}</span>
-                      {s!.session.auto && ` · saved automatically after ${s!.settings.idleMinutes} min without activity`}
-                    </p>
-                    <Button size="sm" variant="destructive" onClick={() => stop.mutate()} disabled={stop.isPending}>
-                      {stop.isPending ? <Loader2 className="animate-spin" /> : <Square />} End and save now
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <p className="mr-auto text-xs text-muted-foreground">
-                      {s!.settings.autoSession
-                        ? s!.config
-                          ? "Waiting: a session starts by itself on the first hit or your own Fame reward."
-                          : "A session starts by itself once your Fame reward or the damage event is recognised."
-                        : "Auto session is off; start one manually."}
-                    </p>
-                    <label className="flex min-w-48 flex-col gap-1">
-                      <FieldLabel>Session name (optional)</FieldLabel>
-                      <Input
-                        value={label}
-                        onChange={(e) => setLabel(e.target.value)}
-                        placeholder="e.g. T6 static – Undead"
-                        className="h-8 text-[13px]"
-                        maxLength={80}
-                      />
-                    </label>
-                    <Button size="sm" variant="outline" onClick={() => start.mutate()} disabled={start.isPending || (!s!.config && !s!.capture.selfName)}>
-                      {start.isPending ? <Loader2 className="animate-spin" /> : <Play />} Start manually
-                    </Button>
-                  </>
+                </div>
+                {(start.error || stop.error) && <p role="alert" className="text-sm text-loss">{(start.error ?? stop.error)!.message}</p>}
+                {session && visible && (
+                  <dl className="grid grid-cols-3 gap-2 sm:gap-3">
+                    {[
+                      { label: "Total Damage", value: formatCompact(visible.total), note: partyOnly && session.party ? "Party members" : "Everyone in view" },
+                      { label: "Session DPS", value: formatCompact(visible.total / seconds), note: "Idle time included" },
+                      { label: "Your DPS", value: self ? formatCompact(self.damage / seconds) : "—", note: s.capture.selfName ?? "Character not recognised yet" },
+                    ].map((item) => (
+                      <div key={item.label} className="min-w-0 rounded-lg border border-border bg-card px-3 py-2">
+                        <dt className="text-xs text-muted-foreground">{item.label}</dt>
+                        <dd className="num mt-1 text-xl font-semibold sm:text-[28px]">{item.value}</dd>
+                        <p className="mt-1 truncate text-[11px] text-muted-foreground">{item.note}</p>
+                      </div>
+                    ))}
+                  </dl>
                 )}
-              </div>
-              {(start.error || stop.error) && <p className="px-3 pt-2 text-xs text-loss">{(start.error ?? stop.error)!.message}</p>}
-              {s!.session ? (
-                <PlayerTable session={s!.session} now={s!.now} partyOnly={partyOnly} selfName={s!.capture.selfName} />
-              ) : (
-                <EmptyState title="No session running">
-                  {s!.lastAutoSave
-                    ? `The last session "${s!.lastAutoSave.label}" was saved; see the history below.`
-                    : "Enter a dungeon and start fighting; the table fills in live here."}
-                </EmptyState>
-              )}
-              <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2 text-xs">
-                <Switch checked={partyOnly} onCheckedChange={setPartyOnly} size="sm" />
-                <span className="text-muted-foreground">
-                  Party only — hide other players in view (the party comes from the game itself, at every zone entry)
-                </span>
-              </div>
-            </Panel>
-
-            <Panel
-              title={
-                <span className="flex items-center gap-2">
-                  <History className="size-4 text-muted-foreground" /> Session history
-                </span>
-              }
-            >
-              {sessions.isPending ? (
-                <TableSkeleton rows={3} />
-              ) : sessions.isError ? (
-                <ErrorState error={sessions.error} onRetry={() => void sessions.refetch()} />
-              ) : sessions.data.sessions.length === 0 ? (
-                <EmptyState title="No saved sessions">Finished sessions are listed here.</EmptyState>
-              ) : (
-                <ul className="divide-y divide-border">
-                  {sessions.data.sessions.map((x) => {
-                    const open = openSession === x.id;
-                    return (
-                      <li key={x.id}>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-xs">
-                          <button
-                            type="button"
-                            className="min-w-0 flex-1 text-left"
-                            onClick={() => setOpenSession(open ? null : x.id)}
-                            aria-expanded={open}
-                          >
-                            <span className="block truncate text-[13px] font-medium">{x.label}</span>
-                            <span className="text-muted-foreground">
-                              {new Date(x.startedAt).toLocaleString("en-GB")} · {formatDuration((x.endedAt ?? x.startedAt) - x.startedAt)} ·{" "}
-                              {x.playerCount} {x.playerCount === 1 ? "player" : "players"}
-                            </span>
-                          </button>
-                          <span className="text-muted-foreground">
-                            Damage <span className="num text-foreground">{formatCompact(x.totalDamage)}</span>
-                            {(x.kills ?? 0) > 0 && <> · Kills <span className="num text-foreground">{x.kills}</span></>}
-                            {x.fame && <> · Fame <span className="num text-foreground">{formatCompact(x.fame.total)}</span></>}
-                            {x.silver && <> · Silver <span className="num text-foreground">{formatCompact(x.silver.net)}</span></>}
-                            {x.balanceChange != null && x.balanceChange !== 0 && (
-                              <> · Balance <span className="num text-foreground">{x.balanceChange > 0 ? "+" : ""}{formatCompact(x.balanceChange)}</span></>
-                            )}
-                            {(x.runCount ?? 0) > 1 && <> · {x.runCount} runs</>}
-                            {x.topPlayer && (
-                              <>
-                                {" "}
-                                · top <span className="text-foreground">{x.topPlayer}</span>
-                              </>
-                            )}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            aria-label="Delete session"
-                            onClick={() => {
-                              if (window.confirm(`Permanently delete the session "${x.label}"?`)) remove.mutate(x.id);
-                            }}
-                          >
-                            <Trash2 />
-                          </Button>
+                <Panel>
+                  {session ? (
+                    <PlayerTable key={session.id} session={session} now={s.now} partyOnly={partyOnly} selfName={s.capture.selfName} onShowAll={() => setPartyOnly(false)} toolbar={filters} />
+                  ) : (
+                    <EmptyState title="Waiting for a session">
+                      {s.lastAutoSave ? (
+                        <div className="space-y-3">
+                          <p>The last session “{s.lastAutoSave.label}” was saved.</p>
+                          <Button variant="outline" onClick={() => { setOpenSession(s.lastAutoSave!.id); setTab("history"); }}>View in History</Button>
                         </div>
-                        {open && (
-                          <div className="border-t border-border bg-background/40">
-                            {detail.isPending ? (
-                              <TableSkeleton rows={3} />
-                            ) : detail.isError ? (
-                              <ErrorState error={detail.error} />
-                            ) : (
-                              <PlayerTable session={detail.data.session} now={s!.now} partyOnly={partyOnly} selfName={s!.capture.selfName} />
+                      ) : "Enter a dungeon and start fighting; the player ranking fills in live here."}
+                    </EmptyState>
+                  )}
+                </Panel>
+              </TabsContent>
+              <TabsContent value="earnings">
+                <Panel title="Personal earnings" actions={session ? <span className="max-w-48 truncate text-xs text-muted-foreground">{session.label}</span> : undefined}>
+                  {session ? (
+                    <><FameSummary session={session} now={s.now} /><SilverSummary session={session} now={s.now} /><RunsSummary session={session} now={s.now} /></>
+                  ) : (
+                    <EmptyState title="No active session">Fame and silver show up here once a session starts. Saved earnings are in the History tab.</EmptyState>
+                  )}
+                </Panel>
+              </TabsContent>
+              <TabsContent value="history">
+                {remove.error && <p role="alert" className="mb-3 text-sm text-loss">{remove.error.message}</p>}
+                <Panel
+                  title={
+                    <span className="flex items-center gap-2">
+                      <History className="size-4 text-muted-foreground" /> Session history
+                    </span>
+                  }
+                >
+                  <div className="border-b border-border p-3">{filters}</div>
+                  {sessions.isPending ? (
+                    <TableSkeleton rows={3} />
+                  ) : sessions.isError ? (
+                    <ErrorState title="Could not load saved sessions" error={sessions.error} onRetry={() => void sessions.refetch()} />
+                  ) : sessions.data.sessions.length === 0 ? (
+                    <EmptyState title="No saved sessions">Finished sessions are listed here.</EmptyState>
+                  ) : (
+                    <ul className="divide-y divide-border">
+                      {sessions.data.sessions.map((x) => {
+                        const open = openSession === x.id;
+                        return (
+                          <li key={x.id}>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-xs">
+                              <button
+                                type="button"
+                                className="min-w-0 flex-1 text-left"
+                                onClick={() => setOpenSession(open ? null : x.id)}
+                                aria-expanded={open}
+                              >
+                                <span className="block truncate text-[13px] font-medium">{x.label}</span>
+                                <span className="text-muted-foreground">
+                                  {new Date(x.startedAt).toLocaleString("en-GB")} · {formatDuration((x.endedAt ?? x.startedAt) - x.startedAt)} ·{" "}
+                                  {x.playerCount} {x.playerCount === 1 ? "player" : "players"}
+                                </span>
+                              </button>
+                              <span className="text-muted-foreground">
+                                Damage <span className="num text-foreground">{formatCompact(x.totalDamage)}</span>
+                                {(x.kills ?? 0) > 0 && <> · Kills <span className="num text-foreground">{x.kills}</span></>}
+                                {x.fame && <> · Fame <span className="num text-foreground">{formatCompact(x.fame.total)}</span></>}
+                                {x.silver && <> · Silver <span className="num text-foreground">{formatCompact(x.silver.net)}</span></>}
+                                {x.balanceChange != null && x.balanceChange !== 0 && (
+                                  <> · Balance <span className="num text-foreground">{x.balanceChange > 0 ? "+" : ""}{formatCompact(x.balanceChange)}</span></>
+                                )}
+                                {(x.runCount ?? 0) > 1 && <> · {x.runCount} runs</>}
+                                {x.topPlayer && (
+                                  <>
+                                    {" "}
+                                    · top <span className="text-foreground">{x.topPlayer}</span>
+                                  </>
+                                )}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                aria-label="Delete session"
+                                disabled={remove.isPending}
+                                onClick={() => {
+                                  if (window.confirm(`Permanently delete the session "${x.label}"?`)) remove.mutate(x.id);
+                                }}
+                              >
+                                <Trash2 />
+                              </Button>
+                            </div>
+                            {open && (
+                              <div className="border-t border-border bg-background/40">
+                                {detail.isPending ? (
+                                  <TableSkeleton rows={3} />
+                                ) : detail.isError ? (
+                                  <ErrorState title="Could not load the session" error={detail.error} onRetry={() => void detail.refetch()} />
+                                ) : (
+                                  <>
+                                    <PlayerTable
+                                      key={detail.data.session.id}
+                                      session={detail.data.session}
+                                      now={s.now}
+                                      partyOnly={partyOnly}
+                                      selfName={detail.data.session.fame?.name ?? detail.data.session.silver?.name ?? s.capture.selfName}
+                                      onShowAll={() => setPartyOnly(false)}
+                                    />
+                                    <Disclosure title="Earnings and runs">
+                                      <FameSummary session={detail.data.session} now={s.now} />
+                                      <SilverSummary session={detail.data.session} now={s.now} />
+                                      <RunsSummary session={detail.data.session} now={s.now} />
+                                    </Disclosure>
+                                  </>
+                                )}
+                              </div>
                             )}
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Panel>
-
-            <p className="text-[11px] leading-relaxed text-muted-foreground/80">
-              Numbers are the events received by the client running the capture: hits by party members out of view range may be
-              missing. Pet/summon damage is shown separately as &quot;unattributed&quot;. Self-healing and
-              PvP damage are not counted in the Damage total. Healing may include overhealing. Very short auto sessions (fewer than 10 hits)
-              without a Fame reward or silver pickup are not saved. The Main Hand column shows the last seen equipment and updates when weapons change.
-            </p>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </Panel>
+              </TabsContent>
+            </Tabs>
+            <p className="text-xs text-muted-foreground">Only events the client sees are measured; scope and usage notes are in Settings.</p>
           </>
-        )}
+        ) : null}
       </div>
     </div>
   );

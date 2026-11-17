@@ -37,14 +37,14 @@ function useCountdown(target?: number) {
   return target ? Math.max(0, Math.ceil((target - now) / 1000)) : null;
 }
 
-export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+export function ErrorState({ error, onRetry, title = "Could not load market data" }: { error: unknown; onRetry?: () => void; title?: string }) {
   const apiErr = error instanceof ClientApiError ? error : null;
   const seconds = useCountdown(apiErr?.retryAt);
   const message = error instanceof Error ? error.message : "Unknown error";
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center" role="alert">
       <AlertTriangle className="size-6 text-loss" aria-hidden />
-      <p className="text-sm font-medium">Could not load market data</p>
+      <p className="text-sm font-medium">{title}</p>
       <p className="max-w-md text-xs text-muted-foreground">{message}</p>
       {apiErr?.kind === "rate_limited" && seconds !== null && (
         <p className="num text-xs text-warn">
