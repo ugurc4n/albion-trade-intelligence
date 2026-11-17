@@ -152,3 +152,55 @@ export function Disclaimer({ className }: { className?: string }) {
     </p>
   );
 }
+
+/**
+ * Why a list came back empty and how to see more: prices older than the data-age limit, or a quiet buy city.
+ * Market prices come from players' clients, so a city nobody scanned recently has only stale prices.
+ */
+export function HiddenOpportunities({
+  hiddenStale,
+  otherCities,
+  buyCity,
+  maxAgeMinutes,
+  onShowStale,
+  onAllCities,
+}: {
+  hiddenStale: number;
+  otherCities: number | null;
+  buyCity: string;
+  maxAgeMinutes: number;
+  onShowStale?: () => void;
+  onAllCities?: () => void;
+}) {
+  if (hiddenStale <= 0 && !otherCities) return null;
+  const where = buyCity === "all" ? "" : ` in ${buyCity}`;
+  return (
+    <div className="mt-1 max-w-md space-y-2 text-xs text-muted-foreground">
+      {hiddenStale > 0 && (
+        <p>
+          <span className="num text-foreground">{formatSilver(hiddenStale)}</span> {hiddenStale === 1 ? "opportunity" : "opportunities"}
+          {where} {hiddenStale === 1 ? "is" : "are"} hidden because a price is older than {formatAge(maxAgeMinutes)}. Prices come from players
+          who opened the market, so a quiet city goes stale.
+        </p>
+      )}
+      {otherCities ? (
+        <p>
+          <span className="num text-foreground">{formatSilver(otherCities)}</span> fresh {otherCities === 1 ? "opportunity" : "opportunities"} in
+          other cities.
+        </p>
+      ) : null}
+      <div className="flex flex-wrap justify-center gap-2">
+        {hiddenStale > 0 && onShowStale && (
+          <Button size="xs" variant="outline" onClick={onShowStale}>
+            Show stale ones
+          </Button>
+        )}
+        {otherCities && onAllCities ? (
+          <Button size="xs" variant="outline" onClick={onAllCities}>
+            Show all cities
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}

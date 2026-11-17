@@ -2,7 +2,7 @@
 
 import { BasketTable } from "@/components/basket-table";
 import { FiltersBar } from "@/components/filters-bar";
-import { DataStatus, Disclaimer, KpiStrip, PageHeader, Panel } from "@/components/page-parts";
+import { DataStatus, Disclaimer, HiddenOpportunities, KpiStrip, PageHeader, Panel } from "@/components/page-parts";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/states";
 import { ProfitValue, Silver } from "@/components/values";
 import { useOpportunities } from "@/hooks/use-opportunities";
@@ -59,6 +59,15 @@ export function OptimizerView() {
           ) : basket.lines.length === 0 ? (
             <EmptyState title="No reliable opportunities for the basket">
               Opportunities flagged as stale, anomalous or extreme ROI, and items over budget, are left out of the basket.
+              {query.data && (
+                <HiddenOpportunities
+                  hiddenStale={query.data.flips.hiddenStale + query.data.trades.hiddenStale}
+                  otherCities={query.data.flips.otherCities === null ? null : query.data.flips.otherCities + (query.data.trades.otherCities ?? 0)}
+                  buyCity={filters?.buyCity ?? settings.homeCity}
+                  maxAgeMinutes={filters?.maxDataAgeMinutes ?? settings.maxDataAgeMinutes}
+                  onAllCities={() => update({ buyCity: "all" })}
+                />
+              )}
             </EmptyState>
           ) : (
             <BasketTable basket={basket} />

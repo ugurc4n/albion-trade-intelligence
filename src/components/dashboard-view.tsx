@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { BasketTable } from "@/components/basket-table";
 import { OpportunityTable } from "@/components/opportunity-table";
-import { DataStatus, Disclaimer, KpiStrip, PageHeader, Panel } from "@/components/page-parts";
+import { DataStatus, Disclaimer, HiddenOpportunities, KpiStrip, PageHeader, Panel } from "@/components/page-parts";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/states";
 import { ProfitValue, Silver } from "@/components/values";
 import { useOpportunities } from "@/hooks/use-opportunities";
@@ -27,16 +27,28 @@ function MoreLink({ href }: { href: string }) {
 export function DashboardView() {
   const { settings } = useSettings();
   const now = useNow();
-  const { filters } = usePageFilters((s) => ({ buyCity: s.homeCity }));
+  const { filters, update } = usePageFilters((s) => ({ buyCity: s.homeCity }));
   const query = useOpportunities("all", filters ?? DEFAULT_FILTERS, 8);
   const data = query.data;
   const fetchedAge = ageFrom(data?.meta.prices.oldestFetchAt, now);
+  const buyCity = filters?.buyCity ?? settings.homeCity;
+  const where = buyCity === "all" ? "all cities" : buyCity;
+  const hint = (list: { hiddenStale: number; otherCities: number | null }) => (
+    <HiddenOpportunities
+      hiddenStale={list.hiddenStale}
+      otherCities={list.otherCities}
+      buyCity={buyCity}
+      maxAgeMinutes={filters?.maxDataAgeMinutes ?? settings.maxDataAgeMinutes}
+      onShowStale={() => update({ includeStale: true })}
+      onAllCities={() => update({ buyCity: "all" })}
+    />
+  );
 
   return (
     <div className="pb-4">
       <PageHeader section="dashboard"
         title="Dashboard"
-        description={`Opportunities from ${settings.homeCity} · ${settings.premium ? "Premium" : "non-Premium"} Sales Tax · min. ROI ${Math.round(settings.minRoi * 100)}% · max. data age ${formatAge(settings.maxDataAgeMinutes)}`}
+        description={`Opportunities from ${where} · ${settings.premium ? "Premium" : "non-Premium"} Sales Tax · min. ROI ${Math.round(settings.minRoi * 100)}% · max. data age ${formatAge(settings.maxDataAgeMinutes)}`}
         actions={<DataStatus meta={data?.meta} isFetching={query.isFetching} onRefresh={() => query.refetch()} />}
       />
 
@@ -97,6 +109,10 @@ export function DashboardView() {
               ) : data.basket.lines.length === 0 ? (
                 <EmptyState title="No reliable opportunity fits the budget">
                   Stale, anomalous or over-budget opportunities are left out of the basket. Try loosening the filters or settings.
+                  {hint({
+                    hiddenStale: data.flips.hiddenStale + data.trades.hiddenStale,
+                    otherCities: data.flips.otherCities === null ? null : data.flips.otherCities + (data.trades.otherCities ?? 0),
+                  })}
                 </EmptyState>
               ) : (
                 <BasketTable basket={{ ...data.basket, lines: data.basket.lines.slice(0, 6) }} compact />
@@ -104,11 +120,11 @@ export function DashboardView() {
             </Panel>
 
             <div className="grid gap-3 2xl:grid-cols-2">
-              <Panel title={`Market Flipping · ${settings.homeCity}`} actions={<MoreLink href="/flipping" />}>
+              <Panel title={`Market Flipping · ${where}`} actions={<MoreLink href="/flipping" />}>
                 {!data ? (
                   <TableSkeleton rows={6} />
                 ) : data.flips.items.length === 0 ? (
-                  <EmptyState title="No flip opportunities" />
+                  <EmptyState title="No flip opportunities">{hint(data.flips)}</EmptyState>
                 ) : (
                   <OpportunityTable
                     data={data.flips.items}
@@ -119,11 +135,11 @@ export function DashboardView() {
                   />
                 )}
               </Panel>
-              <Panel title={`Cross-City Trade · from ${settings.homeCity}`} actions={<MoreLink href="/trade" />}>
+              <Panel title={`Cross-City Trade · from ${where}`} actions={<MoreLink href="/trade" />}>
                 {!data ? (
                   <TableSkeleton rows={6} />
                 ) : data.trades.items.length === 0 ? (
-                  <EmptyState title="No cross-city opportunities" />
+                  <EmptyState title="No cross-city opportunities">{hint(data.trades)}</EmptyState>
                 ) : (
                   <OpportunityTable
                     data={data.trades.items}

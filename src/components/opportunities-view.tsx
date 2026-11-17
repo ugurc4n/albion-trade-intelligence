@@ -2,7 +2,7 @@
 
 import { FiltersBar } from "@/components/filters-bar";
 import { OpportunityTable } from "@/components/opportunity-table";
-import { DataStatus, Disclaimer, PageHeader } from "@/components/page-parts";
+import { DataStatus, Disclaimer, HiddenOpportunities, PageHeader } from "@/components/page-parts";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/states";
 import { useOpportunities } from "@/hooks/use-opportunities";
 import { usePageFilters } from "@/hooks/use-page-filters";
@@ -46,6 +46,14 @@ export function OpportunitiesView({ variant }: { variant: "flip" | "trade" }) {
           <EmptyState title="No opportunities match the filters">
             Try loosening the min. ROI ({Math.round((filters?.minRoi ?? settings.minRoi) * 100)}%), the data-age limit or the city filter. Stale or
             uncertain prices are hidden on purpose.
+            <HiddenOpportunities
+              hiddenStale={list.hiddenStale}
+              otherCities={list.otherCities}
+              buyCity={filters?.buyCity ?? "all"}
+              maxAgeMinutes={maxAge}
+              onShowStale={() => update({ includeStale: true })}
+              onAllCities={() => update({ buyCity: "all" })}
+            />
           </EmptyState>
         ) : (
           <>

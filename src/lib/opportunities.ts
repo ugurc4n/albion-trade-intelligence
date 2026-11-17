@@ -7,7 +7,14 @@ import { scanFlips, scanTrades, type ScanContext } from "@/lib/scanner/scan";
 import type { Opportunity } from "@/lib/scanner/types";
 import type { OpportunitiesRequest } from "@/lib/settings/schema";
 
-export type OpportunityList = { total: number; items: Opportunity[] };
+export type OpportunityList = {
+  total: number;
+  items: Opportunity[];
+  /** Opportunities left out only because a price is older than the data-age limit (0 when stale ones are shown). */
+  hiddenStale: number;
+  /** Fresh opportunities from the other buy cities, when one buy city is selected (null otherwise). */
+  otherCities: number | null;
+};
 
 export type OpportunitiesResponse = {
   flips: OpportunityList;
@@ -32,6 +39,14 @@ export async function runOpportunities(req: OpportunitiesRequest): Promise<Oppor
 
   const flips = kind === "trade" ? [] : scanFlips(snapshot, ctx);
   const trades = kind === "flip" ? [] : scanTrades(snapshot, ctx);
+
+  // What the filters hid, so an empty table can say why: stale prices, or a quiet buy city.
+  const withStale: ScanContext = { ...ctx, filters: { ...filters, includeStale: true } };
+  const anyCity: ScanContext = { ...ctx, filters: { ...filters, buyCity: "all" } };
+  const hidden = (scan: typeof scanFlips, shown: number) => (filters.includeStale ? 0 : scan(snapshot, withStale).length - shown);
+  const elsewhere = (scan: typeof scanFlips, shown: number) => (filters.buyCity === "all" ? null : scan(snapshot, anyCity).length - shown);
+  const flipHints = kind === "trade" ? { hiddenStale: 0, otherCities: null } : { hiddenStale: hidden(scanFlips, flips.length), otherCities: elsewhere(scanFlips, flips.length) };
+  const tradeHints = kind === "flip" ? { hiddenStale: 0, otherCities: null } : { hiddenStale: hidden(scanTrades, trades.length), otherCities: elsewhere(scanTrades, trades.length) };
   const combined = [...flips, ...trades].sort((a, b) => b.score - a.score);
 
   // Instant trades depend on the depth of the book at the quoted price; check the best candidates.
@@ -72,8 +87,8 @@ export async function runOpportunities(req: OpportunitiesRequest): Promise<Oppor
 
   const actionable = combined.filter(isBasketEligible);
   return {
-    flips: { total: flips.length, items: flips.slice(0, limit) },
-    trades: { total: trades.length, items: trades.slice(0, limit) },
+    flips: { total: flips.length, items: flips.slice(0, limit), ...flipHints },
+    trades: { total: trades.length, items: trades.slice(0, limit), ...tradeHints },
     basket,
     summary: {
       opportunityCount: combined.length,
