@@ -26,3 +26,11 @@ export function playerRanking(session: SessionRecord, metric: DamageMetric, name
 export function sessionSeconds(session: SessionRecord, now: number) {
   return Math.max(1, ((session.endedAt ?? now) - session.startedAt) / 1000);
 }
+
+/** Loot source: "@MOB_UNDEAD_SOLDIER_CHAMPION" → "Undead Soldier Champion"; a player's name stays as it is. */
+export function lootSourceLabel(from: string): string {
+  if (!from) return "Unknown";
+  if (!from.startsWith("@")) return from;
+  const words = from.replace(/^@(MOB_)?/, "").split("_").filter(Boolean);
+  return words.map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(" ") || "Unknown";
+}

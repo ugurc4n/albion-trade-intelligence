@@ -51,6 +51,45 @@ describe("party roster", () => {
     expect(h.meter.snapshot()!.party).toEqual(["pesimist"]);
   });
 
+  it("adds a member who enters the zone after you, from a silver split you share", () => {
+    // Live run: the roster on your zone entry had five names; DAYI917 came in later, hit the 2nd most and got
+    // the same silver shares as everyone else, but was missing from the party.
+    const h = harness();
+    h.send(eventMessage(242, { 0: bytes(concat(guid(2), guid(1))) }));
+    h.join();
+    h.character(41813, "Bestianlorry", 2);
+    h.character(50000, "DAYI917", 7); // entered later; no roster update for it
+    h.character(60000, "Stranger", 8);
+    for (const [id, dmg] of [[41865, 100], [41813, 50], [50000, 90], [60000, 30]]) h.hit(id, dmg);
+    expect(h.meter.snapshot()!.party?.sort()).toEqual(["Bestianlorry", "pesimist"]);
+    const silver = (picker: number, to: string, amount: number, at: number) =>
+      h.send(eventMessage(278, { 0: l(picker), 2: s(to), 3: { t: "o", v: true }, 5: l(amount * 10_000) }), at);
+    // Another party's pickup next to you: shares that do not include you prove nothing.
+    for (const to of ["Stranger", "Other"]) silver(60000, to, 300, 10);
+    // One pickup split between your party members (same picker, amount and moment).
+    for (const to of ["Bestianlorry", "pesimist", "DAYI917"]) silver(41813, to, 282, 20);
+    expect(h.meter.snapshot()!.party?.sort()).toEqual(["Bestianlorry", "DAYI917", "pesimist"]);
+  });
+
+  it("keeps two equal pickups in a row apart, and a solo share adds nobody", () => {
+    const h = harness();
+    h.join();
+    const silver = (to: string, at: number) =>
+      h.send(eventMessage(278, { 0: l(41865), 2: s(to), 3: { t: "o", v: true }, 5: l(100 * 10_000) }), at);
+    silver("pesimist", 10);
+    silver("pesimist", 10); // a second identical pickup: a new split, not a party of one name twice
+    expect(h.meter.snapshot()!.party).toBeNull();
+  });
+
+  it("resolves roster GUIDs from player info (104) before the member comes into view", () => {
+    const h = harness();
+    h.send(eventMessage(242, { 0: bytes(concat(guid(2), guid(1))) }));
+    h.join();
+    h.send(eventMessage(104, { 0: bytes(guid(2)), 1: s("woee"), 2: { t: "o", v: true } }));
+    h.hit(41865, 10);
+    expect(h.meter.snapshot()!.party?.sort()).toEqual(["pesimist", "woee"]);
+  });
+
   it("reads PartyJoined names for members not yet in view", () => {
     const decoder = new PhotonDecoder();
     const [msg] = decoder.decodePacket(

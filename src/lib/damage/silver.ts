@@ -13,10 +13,12 @@ import type { PhotonMessage } from "./photon";
  */
 const SILVER_SHARE_EVENT = 278;
 
-export function readSilverShare(msg: PhotonMessage): { name: string; amount: number } | null {
+export type SilverShare = { name: string; amount: number; picker: unknown };
+
+export function readSilverShare(msg: PhotonMessage): SilverShare | null {
   if (msg.kind !== "event" || msg.code !== SILVER_SHARE_EVENT || msg.params.get(3) !== true) return null;
   const name = msg.params.get(2);
   const amount = fixedPoint(msg, 5);
   if (typeof name !== "string" || name.length === 0 || amount === null || amount <= 0) return null;
-  return { name, amount };
+  return { name, amount, picker: msg.params.get(0) ?? null };
 }

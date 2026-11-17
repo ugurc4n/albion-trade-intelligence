@@ -1,15 +1,18 @@
 import { expandRows, isFloatTag, isIdTag, isObjectIdLike } from "./extract";
 import { EQUIPMENT_CHANGED_EVENT, mainHandFromIndex, readEquipmentItem, readJoinEquipment, readMainHand } from "./equipment";
 import { DEFAULT_HEALTH_RULE, readJoin, readNewCharacter } from "./identity";
-import { guidOf, JOIN_GUID_KEY, NEW_CHARACTER_GUID_KEY, readPartyUpdate } from "./party";
+import { guidOf, JOIN_GUID_KEY, NEW_CHARACTER_GUID_KEY, readPartyUpdate, readPlayerInfo } from "./party";
 import { readFameReward } from "./fame";
 import { messageSignature, type PhotonMessage } from "./photon";
 import type { PhotonValue } from "./protocol18";
-import { readSilverShare } from "./silver";
+import { lootItem, readItemLoot } from "./loot";
+import { readSilverShare, type SilverShare } from "./silver";
 import type { DamageConfig, MainHandObservation, PlayerStats, RunRecord, SessionRecord } from "./types";
 import { readBalanceUpdate, readJoinZone } from "./zone";
 
 const MAX_IDENTITIES = 5000;
+/** Loot kept per session; the live state is polled every second, so the list must stay small. */
+export const MAX_LOOT_ENTRIES = 2000;
 const MAX_ITEM_OBJECTS = 20_000;
 /** Shown for your own character until the join reply (next zone change) gives the real name. */
 export const SELF_PLACEHOLDER = "Sen";
@@ -95,6 +98,8 @@ export class DamageMeter {
   private fameCounters = new Map<string, number>();
   /** Silver shares already counted: calibration replays the same message objects, which must not count twice. */
   private silverCounted = new WeakSet<PhotonMessage>();
+  /** Item loot already recorded, for the same reason. */
+  private lootCounted = new WeakSet<PhotonMessage>();
   /** Silver received per player name in this session, and per run (yours is read by name at snapshot time). */
   private silverByName = new Map<string, { net: number; shares: number; lastAt: number }>();
   private runSilver = new WeakMap<RunRecord, Map<string, number>>();
@@ -110,6 +115,13 @@ export class DamageMeter {
   private guidByName = new Map<string, string>();
   private nameByGuid = new Map<string, string>();
   private partyGuids: Set<string> | null = null;
+  /**
+   * Party members proven by silver: a pickup is split into one share per party member (same picker id, same
+   * amount, same moment), so everyone in a split that includes you is in your party. This also covers members
+   * who enter the zone after you: the roster (242) is only sent on your own zone entry.
+   */
+  private splitMates = new Set<string>();
+  private split: { picker: unknown; amount: number; at: number; names: Set<string>; mine: boolean } | null = null;
   private balance: { value: number; at: number } | null = null;
 
   constructor(
@@ -152,6 +164,7 @@ export class DamageMeter {
     this.players = new Map();
     this.playerEquipmentAt = new Map();
     this.silverByName = new Map();
+    this.splitMates = new Set();
     this.lastActivityAt = null;
     this.session = {
       id,
@@ -166,6 +179,7 @@ export class DamageMeter {
       unattributedDamage: 0,
       configCalibratedAt: this.config?.calibratedAt ?? null,
       auto,
+      loot: [],
     };
     return this.snapshot()!;
   }
@@ -182,6 +196,7 @@ export class DamageMeter {
     this.players = new Map();
     this.playerEquipmentAt = new Map();
     this.silverByName = new Map();
+    this.splitMates = new Set();
     this.lastActivityAt = null;
     return done;
   }
@@ -211,6 +226,7 @@ export class DamageMeter {
       silver: mine && this.self ? { name: this.self, net: mine.net, pickups: mine.shares, lastAt: mine.lastAt } : null,
       runs: this.session.runs?.map((r) => ({ ...r, silver: (this.self && this.runSilver.get(r)?.get(this.self)) || 0 })),
       party: this.partyNames(),
+      loot: this.session.loot?.map((l) => ({ ...l, item: l.item ? { ...l.item } : null })),
       balance: this.session.balance ? { ...this.session.balance } : null,
       players: [...this.players.values()].map((p) => ({
         ...p,
@@ -235,6 +251,8 @@ export class DamageMeter {
       this.learn(other.id, other.name);
       this.learnEquipment(other.id, readMainHand(msg, 40), msg.at);
     }
+    const info = readPlayerInfo(msg);
+    if (info) this.rememberGuid(info.name, info.guid);
     const equipmentItem = readEquipmentItem(msg);
     if (equipmentItem) {
       this.itemObjects.delete(equipmentItem.objectId);
@@ -254,6 +272,7 @@ export class DamageMeter {
     this.handleParty(msg);
     this.handleFame(msg);
     this.handleSilver(msg);
+    this.handleLoot(msg);
     const sig = messageSignature(msg);
 
     // A saved calibration only exists when a patch moved the hit event; otherwise the verified layout is used.
@@ -371,11 +390,11 @@ export class DamageMeter {
     }
   }
 
-  /** Party members' names (you included), or null while the game has not said who is in the party. */
+  /** Party members' names (you included), or null while neither the roster nor a silver split has shown one. */
   partyNames(): string[] | null {
-    if (!this.partyGuids) return null;
-    const names = new Set<string>();
-    for (const guid of this.partyGuids) {
+    if (!this.partyGuids && this.splitMates.size === 0) return null;
+    const names = new Set<string>(this.splitMates);
+    for (const guid of this.partyGuids ?? []) {
       const name = this.nameByGuid.get(guid);
       if (name) names.add(name);
     }
@@ -419,6 +438,7 @@ export class DamageMeter {
     const share = readSilverShare(msg);
     if (!share || this.silverCounted.has(msg)) return;
     this.silverCounted.add(msg);
+    this.trackSplit(share, msg.at);
     if (!this.session && this.options.autoSession) {
       this.startSession(this.options.newId(msg.at), autoLabel(msg.at), msg.at, true);
     }
@@ -436,6 +456,28 @@ export class DamageMeter {
     byName.set(share.name, (byName.get(share.name) ?? 0) + share.amount);
     this.runSilver.set(run, byName);
     this.lastActivityAt = Math.max(this.lastActivityAt ?? 0, msg.at);
+  }
+
+  /** Items picked up by anyone in view, while a session runs (loot alone does not start one). */
+  private handleLoot(msg: PhotonMessage) {
+    const loot = readItemLoot(msg);
+    const session = this.session;
+    if (!loot || !session || msg.at < session.startedAt || this.lootCounted.has(msg)) return;
+    this.lootCounted.add(msg);
+    const list = (session.loot ??= []);
+    if (list.length >= MAX_LOOT_ENTRIES) return;
+    list.push({ ...loot, item: lootItem(loot.index) });
+    if (loot.by === this.self) this.lastActivityAt = Math.max(this.lastActivityAt ?? 0, msg.at);
+  }
+
+  /** Groups consecutive shares of one pickup; a group that includes you names your party members. */
+  private trackSplit(share: SilverShare, at: number) {
+    const g = this.split;
+    const same = g !== null && g.picker === share.picker && g.amount === share.amount && Math.abs(at - g.at) <= 1000 && !g.names.has(share.name);
+    const group = same ? g : (this.split = { picker: share.picker, amount: share.amount, at, names: new Set<string>(), mine: false });
+    group.names.add(share.name);
+    if (share.name === this.self) group.mine = true;
+    if (group.mine && group.names.size > 1) for (const name of group.names) this.splitMates.add(name);
   }
 
   /** Records your own character; a placeholder name (from Fame) is renamed in place once the join reply arrives. */

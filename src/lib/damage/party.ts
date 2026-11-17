@@ -1,4 +1,5 @@
 import type { PhotonMessage } from "./photon";
+import { looksLikeCharacterName } from "./identity";
 import type { PhotonValue } from "./protocol18";
 
 /**
@@ -37,6 +38,20 @@ function guidList(value: PhotonValue | undefined): string[] | null {
     return guids.every((g): g is string => g !== null) ? guids : null;
   }
   return null;
+}
+
+/**
+ * Player info (104): a user GUID at key 0 and that player's name at key 1, sent for players who are not
+ * necessarily in view (seen in local captures for party members right after the roster, and for many others).
+ * It lets roster GUIDs resolve to names before the member comes into view.
+ */
+const PLAYER_INFO_EVENT = 104;
+
+export function readPlayerInfo(msg: PhotonMessage): { guid: string; name: string } | null {
+  if (msg.kind !== "event" || msg.code !== PLAYER_INFO_EVENT) return null;
+  const guid = guidOf(msg.params.get(0));
+  const name = msg.params.get(1);
+  return guid && typeof name === "string" && looksLikeCharacterName(name) ? { guid, name } : null;
 }
 
 export type PartyUpdate =

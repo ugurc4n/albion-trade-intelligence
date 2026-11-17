@@ -32,6 +32,11 @@ export const damageApi = {
   sessions: (signal?: AbortSignal) => call<{ sessions: SessionSummary[] }>("/api/damage/sessions", { signal, cache: "no-store" }),
   session: (id: string, signal?: AbortSignal) =>
     call<{ session: SessionRecord }>(`/api/damage/sessions/${encodeURIComponent(id)}`, { signal, cache: "no-store" }),
+  lootValues: (server: string, ids: string[], signal?: AbortSignal) =>
+    call<{ server: string; values: Record<string, number | null> }>(
+      `/api/damage/loot-values?server=${encodeURIComponent(server)}&ids=${encodeURIComponent(ids.join(","))}`,
+      { signal },
+    ),
   deleteSession: (id: string) => call<{ ok: true }>(`/api/damage/sessions/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };
 

@@ -94,6 +94,19 @@ export type SilverStats = {
   lastAt: number;
 };
 
+/** One item someone picked up (party members and other players in view). Quality is not in the message. */
+export type LootEntry = {
+  at: number;
+  /** Looter's character name. */
+  by: string;
+  /** Mob unique name ("@MOB_…") or a player's name for a corpse; "" when missing. */
+  from: string;
+  index: number;
+  quantity: number;
+  /** Catalog item for the index; null when the catalog does not know it. */
+  item: { id: string; nameEn: string; tier: number; enchant: number } | null;
+};
+
 /** One stay in one zone (between two join replies) inside a session. */
 export type RunRecord = {
   /** Zone id from the join reply: a cluster id ("3207") or an instance id ("@RANDOMDUNGEON@<guid>"); null if unknown. */
@@ -138,6 +151,8 @@ export type SessionRecord = {
   configCalibratedAt: string | null;
   /** Started on the first hit and closed after a quiet period (vs. started/stopped by hand). */
   auto?: boolean;
+  /** Items picked up, oldest first. Optional for older saved sessions; capped at MAX_LOOT_ENTRIES. */
+  loot?: LootEntry[];
 };
 
 export type SessionSummary = Pick<SessionRecord, "id" | "label" | "startedAt" | "endedAt" | "unattributedDamage"> & {
@@ -149,6 +164,8 @@ export type SessionSummary = Pick<SessionRecord, "id" | "label" | "startedAt" | 
   runCount?: number;
   balanceChange?: number | null;
   kills?: number;
+  /** Number of items picked up (all looters). */
+  lootCount?: number;
 };
 
 /** Mob kills by every named player in the session (the party, plus anyone else fighting nearby). */
@@ -171,6 +188,7 @@ export function summarizeSession(s: SessionRecord): SessionSummary {
     silver: s.silver ? { name: s.silver.name, net: s.silver.net } : null,
     runCount: s.runs?.length ?? 0,
     kills: sessionKills(s),
+    lootCount: s.loot?.reduce((sum, l) => sum + l.quantity, 0) ?? 0,
     balanceChange: s.balance ? s.balance.end - s.balance.start : null,
   };
 }

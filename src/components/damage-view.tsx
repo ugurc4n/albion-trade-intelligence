@@ -7,7 +7,6 @@ import {
   ChevronRight,
   Circle,
   CircleDot,
-  Coins,
   Copy,
   Crosshair,
   History,
@@ -26,6 +25,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Pill } from "@/components/badges";
+import { LootPanel } from "@/components/damage-loot";
 import { PlayerTable } from "@/components/damage-player-table";
 import { NativeSelect } from "@/components/filters-bar";
 import { PageHeader, Panel } from "@/components/page-parts";
@@ -108,14 +108,14 @@ function FameSummary({ session, now }: { session: SessionRecord; now: number }) 
   const fame = session.fame;
   if (!fame) return (
     <div className="border-b border-border px-3 py-3 text-xs text-muted-foreground">
-      <span lang="en" className="font-medium text-foreground">Personal Fame</span> · No Fame for your character in this session.
+      <span lang="en" className="font-medium text-foreground">Combat Fame</span> · No Fame for your character in this session.
       {!session.endedAt && " Change zones while the capture is running; Fame shows up here as you earn it."}
     </div>
   );
   const seconds = Math.max(1, ((session.endedAt ?? now) - session.startedAt) / 1000);
   const kills = sessionKills(session);
   const metrics = [
-    ["Total Fame", formatSilver(fame.total)],
+    ["Combat Fame", formatSilver(fame.total)],
     ["Fame/hour", formatSilver(fame.total * 3600 / seconds)],
     ...(kills > 0 ? [["Fame/kill", formatSilver(fame.total / kills)]] : []),
     ["Fame (zone incl.)", formatSilver(fame.zoneIncluded)],
@@ -126,7 +126,7 @@ function FameSummary({ session, now }: { session: SessionRecord; now: number }) 
   return (
     <div className="border-b border-border bg-fuchsia-500/5 px-3 py-3">
       <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-        <span lang="en" className="font-medium">Personal Fame</span>
+        <span lang="en" className="font-medium">Combat Fame</span>
         <span className="font-medium text-fuchsia-300">{fame.name}</span>
         <span className="text-muted-foreground">· rewards earned in this session only</span>
       </div>
@@ -139,7 +139,7 @@ function FameSummary({ session, now }: { session: SessionRecord; now: number }) 
         ))}
       </dl>
       <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-        Total Fame is the zone-included Fame plus the Premium and Satchel contributions.
+        Combat Fame is the zone-included Fame plus the Premium and Satchel contributions.
         Bonus modifier is the rate reported with the last reward; it is already part of the Fame and is not added again.
         Buff names and remaining time are not in this data. Rewards earned while the capture was not running are not included.
       </p>
@@ -631,6 +631,48 @@ function TrackingNotice({ s, onSettings }: { s: DamageState; onSettings: () => v
 
 /* ---------- main view ---------- */
 
+/** Headline numbers of a session (live or saved): damage for the table's scope, your own Combat Fame and silver. */
+function SessionKpis({ session, now, partyOnly, selfName }: { session: SessionRecord; now: number; partyOnly: boolean; selfName: string | null }) {
+  const scope = partyOnly && session.party ? session.party : null;
+  const total = playerRanking(session, "damage", scope).total;
+  const seconds = sessionSeconds(session, now);
+  const self = selfName ? session.players.find((p) => p.name.toLowerCase() === selfName.toLowerCase()) : undefined;
+  const fame = session.fame?.total ?? 0;
+  const silver = session.silver?.net ?? 0;
+  const perHour = (value: number) => `${formatCompact(value * 3600 / seconds)} per hour`;
+  const items = [
+    { label: "Total Damage", value: formatCompact(total), note: scope ? "Party members" : "Everyone in view" },
+    { label: "Session DPS", value: formatCompact(total / seconds), note: "Idle time included" },
+    { label: "Your DPS", value: self ? formatCompact(self.damage / seconds) : "—", note: selfName ?? "Character not recognised yet" },
+    { label: "Combat Fame", value: fame > 0 ? formatCompact(fame) : "—", note: fame > 0 ? perHour(fame) : "No Fame reward yet", tone: "text-fuchsia-300" },
+    { label: "Silver", value: silver > 0 ? formatCompact(silver) : "—", note: silver > 0 ? `${perHour(silver)} · your share` : "No silver pickup yet", tone: "text-amber-300" },
+  ];
+  return (
+    <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
+      {items.map((item) => (
+        <div key={item.label} className="min-w-0 rounded-lg border border-border bg-card px-3 py-2">
+          <dt className="text-xs text-muted-foreground">{item.label}</dt>
+          <dd className={cn("num mt-1 text-xl font-semibold sm:text-2xl", item.tone)}>{item.value}</dd>
+          <p className="mt-1 truncate text-[11px] text-muted-foreground">{item.note}</p>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Fame, silver and per-zone runs in detail; folded away so the player table stays in view. */
+function EarningsDetails({ session, now }: { session: SessionRecord; now: number }) {
+  return (
+    <Disclosure title="Fame, silver and runs in detail">
+      <div className="-m-2.5">
+        <FameSummary session={session} now={now} />
+        <SilverSummary session={session} now={now} />
+        <RunsSummary session={session} now={now} />
+      </div>
+    </Disclosure>
+  );
+}
+
 export function DamageView() {
   const qc = useQueryClient();
   const [partyOnly, setPartyOnly] = useState(true);
@@ -680,9 +722,6 @@ export function DamageView() {
 
   const s = state.data;
   const session = s?.session;
-  const visible = session ? playerRanking(session, "damage", partyOnly && session.party ? session.party : null) : null;
-  const seconds = session && s ? sessionSeconds(session, s.now) : 1;
-  const self = session?.players.find((p) => s?.capture.selfName && p.name.toLowerCase() === s.capture.selfName.toLowerCase());
   const filters = (
     <label className="flex items-center gap-2 text-sm" title="Hide other players in view. The party comes from the game itself, at every zone entry.">
       <Switch checked={partyOnly} onCheckedChange={setPartyOnly} size="sm" />
@@ -744,7 +783,6 @@ export function DamageView() {
             <Tabs value={tab} onValueChange={(value) => setTab(String(value))} className="gap-3">
               <TabsList className="h-10 w-full sm:w-fit">
                 <TabsTrigger value="live" className="px-5"><Swords />Live</TabsTrigger>
-                <TabsTrigger value="earnings" className="px-5"><Coins />Earnings</TabsTrigger>
                 <TabsTrigger value="history" className="px-5"><History />History</TabsTrigger>
               </TabsList>
               <TabsContent value="live" className="space-y-3">
@@ -779,21 +817,7 @@ export function DamageView() {
                   )}
                 </div>
                 {(start.error || stop.error) && <p role="alert" className="text-sm text-loss">{(start.error ?? stop.error)!.message}</p>}
-                {session && visible && (
-                  <dl className="grid grid-cols-3 gap-2 sm:gap-3">
-                    {[
-                      { label: "Total Damage", value: formatCompact(visible.total), note: partyOnly && session.party ? "Party members" : "Everyone in view" },
-                      { label: "Session DPS", value: formatCompact(visible.total / seconds), note: "Idle time included" },
-                      { label: "Your DPS", value: self ? formatCompact(self.damage / seconds) : "—", note: s.capture.selfName ?? "Character not recognised yet" },
-                    ].map((item) => (
-                      <div key={item.label} className="min-w-0 rounded-lg border border-border bg-card px-3 py-2">
-                        <dt className="text-xs text-muted-foreground">{item.label}</dt>
-                        <dd className="num mt-1 text-xl font-semibold sm:text-[28px]">{item.value}</dd>
-                        <p className="mt-1 truncate text-[11px] text-muted-foreground">{item.note}</p>
-                      </div>
-                    ))}
-                  </dl>
-                )}
+                {session && <SessionKpis session={session} now={s.now} partyOnly={partyOnly} selfName={s.capture.selfName} />}
                 <Panel>
                   {session ? (
                     <PlayerTable key={session.id} session={session} now={s.now} partyOnly={partyOnly} selfName={s.capture.selfName} onShowAll={() => setPartyOnly(false)} toolbar={filters} />
@@ -808,15 +832,8 @@ export function DamageView() {
                     </EmptyState>
                   )}
                 </Panel>
-              </TabsContent>
-              <TabsContent value="earnings">
-                <Panel title="Personal earnings" actions={session ? <span className="max-w-48 truncate text-xs text-muted-foreground">{session.label}</span> : undefined}>
-                  {session ? (
-                    <><FameSummary session={session} now={s.now} /><SilverSummary session={session} now={s.now} /><RunsSummary session={session} now={s.now} /></>
-                  ) : (
-                    <EmptyState title="No active session">Fame and silver show up here once a session starts. Saved earnings are in the History tab.</EmptyState>
-                  )}
-                </Panel>
+                {session && <LootPanel session={session} partyOnly={partyOnly} selfName={s.capture.selfName} />}
+                {session && <EarningsDetails session={session} now={s.now} />}
               </TabsContent>
               <TabsContent value="history">
                 {remove.error && <p role="alert" className="mb-3 text-sm text-loss">{remove.error.message}</p>}
@@ -889,6 +906,14 @@ export function DamageView() {
                                   <ErrorState title="Could not load the session" error={detail.error} onRetry={() => void detail.refetch()} />
                                 ) : (
                                   <>
+                                    <div className="p-3">
+                                      <SessionKpis
+                                        session={detail.data.session}
+                                        now={s.now}
+                                        partyOnly={partyOnly}
+                                        selfName={detail.data.session.fame?.name ?? detail.data.session.silver?.name ?? s.capture.selfName}
+                                      />
+                                    </div>
                                     <PlayerTable
                                       key={detail.data.session.id}
                                       session={detail.data.session}
@@ -897,11 +922,14 @@ export function DamageView() {
                                       selfName={detail.data.session.fame?.name ?? detail.data.session.silver?.name ?? s.capture.selfName}
                                       onShowAll={() => setPartyOnly(false)}
                                     />
-                                    <Disclosure title="Earnings and runs">
-                                      <FameSummary session={detail.data.session} now={s.now} />
-                                      <SilverSummary session={detail.data.session} now={s.now} />
-                                      <RunsSummary session={detail.data.session} now={s.now} />
-                                    </Disclosure>
+                                    <div className="space-y-3 p-3">
+                                      <LootPanel
+                                        session={detail.data.session}
+                                        partyOnly={partyOnly}
+                                        selfName={detail.data.session.fame?.name ?? detail.data.session.silver?.name ?? s.capture.selfName}
+                                      />
+                                      <EarningsDetails session={detail.data.session} now={s.now} />
+                                    </div>
                                   </>
                                 )}
                               </div>
