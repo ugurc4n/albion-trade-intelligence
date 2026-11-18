@@ -1,14 +1,30 @@
 # Windows installer for Albion Trade Intelligence (built on GitHub Actions: .github/workflows/desktop.yml)
+#
+# Updates: installed copies check the public releases repo under `publish` (not the source repo, which can go
+# private without cutting anyone off). That owner/repo is written into every installer, so do not change it
+# lightly: copies installed before a change keep looking at the old place.
 appId: com.ugurc4n.albiontradeintelligence
 productName: Albion Trade Intelligence
 directories:
   output: dist-electron
   buildResources: electron/build
 # Only the Electron shell goes into app.asar; the web app ships as a ready-made standalone server.
+# electron-builder also adds the production "dependencies" of package.json, which are only electron-updater
+# and what it needs: everything the web app uses is a devDependency and already sits in the standalone server.
 files:
   - electron/**/*
+  - "!electron/build/**/*"
   - package.json
-  - "!node_modules/**/*"
+# Where `npm run release:win` (and the workflow, on a v* tag) publishes, and where the app looks for updates.
+# Publishing needs GH_TOKEN: a token with "Contents: Read and write" on that repo.
+publish:
+  provider: github
+  owner: ugurc4n
+  repo: albion-trade-intelligence
+  releaseType: release
+# Written by scripts/release-notes.mjs right before packaging: the changes since the previous release.
+releaseInfo:
+  releaseNotesFile: build/release-notes.md
 extraResources:
   - from: .next-electron/standalone
     to: server

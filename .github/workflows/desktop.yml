@@ -1,6 +1,8 @@
 # Builds the Windows installer (Setup.exe) for the desktop app.
 #  - Run it by hand from the Actions tab ("Run workflow") to get the installer as a downloadable artifact.
-#  - Push a tag like v0.1.0 to also publish it as a GitHub Release.
+#  - Push a tag like v0.5.0 (equal to "version" in package.json) to publish it as a release in the public
+#    releases repo (`publish` in electron-builder.yml). Installed apps pick it up from there automatically.
+#    Needs the RELEASES_TOKEN secret: a fine-grained token with "Contents: Read and write" on that repo.
 name: Windows desktop app
 
 on:
@@ -9,13 +11,28 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
+
+env:
+  RELEASES_REPO: ugurc4n/albion-trade-intelligence
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags, for the release notes
+
+      - name: Check the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($env:GITHUB_REF_NAME -ne "v$version") { throw "Tag $env:GITHUB_REF_NAME does not match package.json version $version" }
+          if (-not $env:RELEASES_TOKEN) { throw "The RELEASES_TOKEN secret is not set (see the top of this file)" }
 
       - uses: actions/setup-node@v4
         with:
@@ -41,7 +58,7 @@ jobs:
         run: npm run build:desktop
 
       - name: Package the installer
-        run: npx electron-builder --win --publish never
+        run: npm run dist:win
 
       - name: Check the package contents
         shell: pwsh
@@ -51,9 +68,13 @@ jobs:
             "$r/server/server.js",
             "$r/server/node_modules/next/package.json",
             "$r/server/.next-electron/static",
-            "$r/capture/AlbionCapture.exe"
+            "$r/capture/AlbionCapture.exe",
+            "$r/app-update.yml",
+            "dist-electron/latest.yml"
           )
           foreach ($p in $required) { if (-not (Test-Path $p)) { throw "Missing from package: $p" } }
+          $asar = npx --no-install asar list "$r/app.asar"
+          if (-not ($asar -match "electron-updater")) { throw "electron-updater is missing from app.asar" }
           Get-ChildItem dist-electron/*.exe | ForEach-Object { "{0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB) }
 
       - name: Upload installer
@@ -63,11 +84,14 @@ jobs:
           path: dist-electron/*.exe
           if-no-files-found: error
 
+      # The installer, its blockmap (lets updates download only what changed) and latest.yml (what the app
+      # reads to find a new version) must all be on the release.
       - name: Publish release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
         run: |
-          $files = (Get-ChildItem dist-electron/*.exe).FullName
-          gh release create $env:GITHUB_REF_NAME $files --title "Albion Trade Intelligence $env:GITHUB_REF_NAME" --generate-notes
+          $files = @(Get-ChildItem dist-electron/*.exe, dist-electron/*.exe.blockmap, dist-electron/latest.yml).FullName
+          gh release create $env:GITHUB_REF_NAME $files --repo $env:RELEASES_REPO --title "Albion Trade Intelligence $env:GITHUB_REF_NAME" --notes-file build/release-notes.md --latest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

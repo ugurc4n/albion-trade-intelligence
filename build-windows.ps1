@@ -37,7 +37,7 @@ npm run build:desktop
 if ($LASTEXITCODE -ne 0) { Fail "Uygulama derlenemedi." }
 
 Step "Kurulum dosyası paketleniyor"
-npx electron-builder --win --publish never
+npm run dist:win
 if ($LASTEXITCODE -ne 0) { Fail "Paketleme başarısız oldu." }
 
 $setup = Get-ChildItem "dist-electron\*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1

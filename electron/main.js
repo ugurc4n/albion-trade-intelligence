@@ -13,6 +13,7 @@ const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
+const { setupUpdates, interceptQuit } = require("./updater");
 
 const APP_NAME = "Albion Trade Intelligence";
 const START_TIMEOUT_MS = 60_000;
@@ -85,16 +86,41 @@ function waitForServer(url, deadline) {
   });
 }
 
-const LOADING_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${APP_NAME}</title>
+const loadingPage = (text) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${APP_NAME}</title>
 <style>html,body{height:100%;margin:0;background:#11132a;color:#e8e9ff;font-family:Segoe UI,system-ui,sans-serif}
 body{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px}
 .mark{width:48px;height:48px;background:#7c6cff;color:#fff;display:grid;place-items:center;font-weight:700;letter-spacing:.04em;
 clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px)}
 p{margin:0;font-size:13px;color:#a9abd6}</style></head>
-<body><div class="mark">AT</div><p>Starting…</p></body></html>`;
+<body><div class="mark">AT</div><p>${text}</p></body></html>`;
+
+/** Stops the app server and resolves once it has exited (or after a few seconds, whichever comes first). */
+function stopServer() {
+  return new Promise((resolve) => {
+    if (!server) return resolve();
+    const timer = setTimeout(resolve, 5000);
+    server.once("exit", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    server.kill();
+  });
+}
 
 async function start() {
   Menu.setApplicationMenu(null);
+  setupUpdates({
+    window: () => mainWindow,
+    prepareForInstall: async () => {
+      quitting = true;
+      overlay?.close();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        await mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(loadingPage("Installing the update…"))}`).catch(() => {});
+      }
+      // The capture watches the server's process id and exits on its own within ~2 seconds.
+      await stopServer();
+    },
+  });
   mainWindow = new BrowserWindow({
     width: 1360,
     height: 880,
@@ -112,7 +138,7 @@ async function start() {
     // The overlay belongs to the main window: closing the app closes it too.
     app.quit();
   });
-  await mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(LOADING_HTML)}`);
+  await mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(loadingPage("Starting…"))}`);
 
   // Links to other sites (render.albiononline.com icons are images, not links) open in the normal browser.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -167,7 +193,12 @@ async function start() {
   }
 }
 
-app.on("before-quit", () => {
+app.on("before-quit", (event) => {
+  // A downloaded update installs on the way out; the updater stops the server first, then quits.
+  if (interceptQuit()) {
+    event.preventDefault();
+    return;
+  }
   quitting = true;
   // The capture notices the server is gone and exits on its own (it watches the server's process id).
   if (server) server.kill();

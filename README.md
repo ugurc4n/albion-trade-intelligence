@@ -173,9 +173,28 @@ Tek pencerelik Windows uygulaması: market, Avalon ve damage meter aynı yerde, 
 2. Bu depoyu ZIP olarak indirip bir klasöre çıkar.
 3. `build-windows.cmd` dosyasına çift tıkla. Bitince `dist-electron\AlbionTradeIntelligence-Setup-<sürüm>.exe` açılır.
 
-**GitHub Actions:** `.github/workflows/desktop.yml` aynı adımları GitHub'ın Windows makinesinde çalıştırır (elle "Run workflow" ya da `v*` etiketiyle; etikette Release'e de yükler). Hesapta fatura kilidi varsa GitHub iş akışını başlatmaz.
+**GitHub Actions:** `.github/workflows/desktop.yml` aynı adımları GitHub'ın Windows makinesinde çalıştırır. Elle "Run workflow" kurulum dosyasını indirilebilir artifact olarak verir; `v*` etiketi ise sürümü yayınlar (aşağıya bak). Hesapta fatura kilidi varsa GitHub iş akışını başlatmaz.
 
-**Paylaşma:** Setup.exe sıradan bir dosyadır (Drive, WeTransfer, USB). Kurulum tek tıklıktır ve yönetici izni istemez. Uygulama imzasız olduğundan Windows ilk açılışta "Bilgisayarınızı korudu" uyarısı gösterir: *Ek bilgi → Yine de çalıştır*.
+**Paylaşma:** İndirme linki tektir: <https://github.com/ugurc4n/albion-trade-intelligence/releases/latest>. Kurulum tek tıklıktır ve yönetici izni istemez. Uygulama imzasız olduğundan Windows ilk açılışta "Bilgisayarınızı korudu" uyarısı gösterir: *Ek bilgi → Yine de çalıştır*.
+
+### Otomatik güncelleme
+
+Kurulu uygulama açıldıktan ~10 sn sonra ve sonra 4 saatte bir yeni sürüm var mı diye bakar, varsa arka planda indirir. İndirme bitince kenar çubuğunda **Restart to update** çıkar; kullanıcı basmazsa güncelleme uygulama kapanırken sessizce kurulur. Kurmadan önce uygulama sunucusunu durdurur ve yakalayıcının (`AlbionCapture.exe`) kapanmasını bekler, yoksa dosyası kilitli kalır. Ayrıntılar: `electron/updater.js`, kayıt: `%APPDATA%\Albion Trade Intelligence\updater.log`.
+
+Sürümler kaynak koddan **ayrı, herkese açık** `ugurc4n/albion-trade-intelligence` deposunda yayınlanır (`electron-builder.yml` → `publish`). Bu adres her kurulum dosyasının içine yazılır; böylece bu kaynak depo ileride private olsa da kullanıcılar güncelleme almaya devam eder. Adresi değiştirmek, eski kurulumları eski adreste bırakır.
+
+**Bir kerelik kurulum:**
+1. GitHub'da **public** `albion-trade-intelligence` deposunu oluştur ve README ile başlat (boş depoda sürüm etiketi açılamaz). Bu isim, bu deponun eski adıdır; GitHub şu an onu buraya yönlendiriyor, yeni depo açınca yönlendirme kalkar.
+2. Bir *fine-grained personal access token* oluştur: yalnızca o depo, **Contents: Read and write**.
+3. Bu depoda *Settings → Secrets and variables → Actions* altına `RELEASES_TOKEN` adıyla ekle.
+
+**Sürüm çıkarmak:**
+1. `package.json` içindeki `version`'ı artır (ör. `0.5.0`), commit'le ve push'la.
+2. `git tag v0.5.0 && git push origin v0.5.0`. İş akışı etiketin `package.json` ile aynı olduğunu kontrol eder, paketler ve kurulum dosyasını, `.blockmap`'i ve `latest.yml`'ı sürüm notlarıyla (`scripts/release-notes.mjs`: önceki etiketten bu yana commit başlıkları) releases deposuna yükler.
+
+GitHub Actions çalışmıyorsa aynı şeyi kendi bilgisayarından yapabilirsin: `build-windows.cmd`'nin adımlarını (`npm ci`, yakalayıcı, `npm run build:desktop`) çalıştırdıktan sonra `$env:GH_TOKEN = "<token>"; npm run release:win`.
+
+Sürüm yayınlanınca geri alınmaz gibi düşün: kullanıcılar birkaç saat içinde indirir. Bozuk bir sürümü düzeltmenin yolu, sürüm numarasını artırıp yenisini çıkarmaktır.
 
 **Nasıl çalışır:** `electron/main.js`, Next.js'in standalone sunucusunu (`npm run build:desktop` → `.next-electron/standalone`) boş bir loopback portunda Electron utility process olarak başlatıp pencerede gösterir. Kullanıcı verisi `%APPDATA%\Albion Trade Intelligence\data` altındadır (`ATI_DATA_DIR`). Yakalayıcı `/target:winexe` ile konsolsuz derlenir ve `--parent <pid>` ile çağrılır; her ~2 sn'de bir boş paketle "kalp atışı" gönderir, uygulama "dur" dediğinde, sunucu süreci kapandığında ya da 20 sn ulaşılamadığında kendini kapatır.
 

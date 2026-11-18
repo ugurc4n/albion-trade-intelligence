@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useState, type ReactNode } from "react";
 import { ItemSearch } from "@/components/item-search";
+import { UpdateStatus } from "@/components/update-status";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useSettings } from "@/hooks/use-settings";
@@ -113,6 +114,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Brand />
         <NavLinks />
         <div className="mt-auto space-y-2">
+          <UpdateStatus />
           <ProfileSummary />
           <p className="px-1 text-[10px] leading-snug text-muted-foreground/70">
             Data comes from the Albion Online Data Project (player clients). This is a decision aid; profit is not guaranteed.
@@ -141,7 +143,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="flex h-full flex-col gap-5">
             <Brand />
             <NavLinks onNavigate={() => setMenuOpen(false)} />
-            <div className="mt-auto">
+            <div className="mt-auto space-y-2">
+              <UpdateStatus />
               <ProfileSummary />
             </div>
           </div>

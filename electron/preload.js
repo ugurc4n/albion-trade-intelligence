@@ -1,6 +1,6 @@
 /**
- * Bridge between the web app and the desktop shell. Only what the overlay controls need is exposed;
- * pages get no direct access to Node or Electron.
+ * Bridge between the web app and the desktop shell. Only what the overlay controls and the update status
+ * need is exposed; pages get no direct access to Node or Electron.
  */
 const { contextBridge, ipcRenderer } = require("electron");
 
@@ -18,5 +18,12 @@ contextBridge.exposeInMainWorld("atiDesktop", {
     isOpen: () => ipcRenderer.invoke("overlay:is-open"),
     onOpenChange: (callback) => subscribe("overlay:open", callback),
     onLockChange: (callback) => subscribe("overlay:locked", callback),
+  },
+  updates: {
+    getState: () => ipcRenderer.invoke("updates:get-state"),
+    check: () => ipcRenderer.invoke("updates:check"),
+    install: () => ipcRenderer.send("updates:install"),
+    openNotes: () => ipcRenderer.send("updates:open-notes"),
+    onStateChange: (callback) => subscribe("updates:state", callback),
   },
 });
