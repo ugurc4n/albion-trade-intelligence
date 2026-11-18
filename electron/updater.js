@@ -19,7 +19,7 @@ const FIRST_CHECK_DELAY_MS = 10_000;
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 const CAPTURE_EXIT_TIMEOUT_MS = 10_000;
 // electron-builder.yml `publish`; only used to link to the release page.
-const RELEASES_URL = "https://github.com/ugurc4n/albion-trade-intelligence/releases";
+const RELEASES_URL = "https://github.com/ugurc4n/albi-update/releases";
 
 /**
  * What the sidebar shows. `phase`:

@@ -20,7 +20,7 @@ files:
 publish:
   provider: github
   owner: ugurc4n
-  repo: albion-trade-intelligence
+  repo: albi-update
   releaseType: release
 # Written by scripts/release-notes.mjs right before packaging: the changes since the previous release.
 releaseInfo:

@@ -175,16 +175,16 @@ Tek pencerelik Windows uygulaması: market, Avalon ve damage meter aynı yerde, 
 
 **GitHub Actions:** `.github/workflows/desktop.yml` aynı adımları GitHub'ın Windows makinesinde çalıştırır. Elle "Run workflow" kurulum dosyasını indirilebilir artifact olarak verir; `v*` etiketi ise sürümü yayınlar (aşağıya bak). Hesapta fatura kilidi varsa GitHub iş akışını başlatmaz.
 
-**Paylaşma:** İndirme linki tektir: <https://github.com/ugurc4n/albion-trade-intelligence/releases/latest>. Kurulum tek tıklıktır ve yönetici izni istemez. Uygulama imzasız olduğundan Windows ilk açılışta "Bilgisayarınızı korudu" uyarısı gösterir: *Ek bilgi → Yine de çalıştır*.
+**Paylaşma:** İndirme linki tektir: <https://github.com/ugurc4n/albi-update/releases/latest>. Kurulum tek tıklıktır ve yönetici izni istemez. Uygulama imzasız olduğundan Windows ilk açılışta "Bilgisayarınızı korudu" uyarısı gösterir: *Ek bilgi → Yine de çalıştır*.
 
 ### Otomatik güncelleme
 
 Kurulu uygulama açıldıktan ~10 sn sonra ve sonra 4 saatte bir yeni sürüm var mı diye bakar, varsa arka planda indirir. İndirme bitince kenar çubuğunda **Restart to update** çıkar; kullanıcı basmazsa güncelleme uygulama kapanırken sessizce kurulur. Kurmadan önce uygulama sunucusunu durdurur ve yakalayıcının (`AlbionCapture.exe`) kapanmasını bekler, yoksa dosyası kilitli kalır. Ayrıntılar: `electron/updater.js`, kayıt: `%APPDATA%\Albion Trade Intelligence\updater.log`.
 
-Sürümler kaynak koddan **ayrı, herkese açık** `ugurc4n/albion-trade-intelligence` deposunda yayınlanır (`electron-builder.yml` → `publish`). Bu adres her kurulum dosyasının içine yazılır; böylece bu kaynak depo ileride private olsa da kullanıcılar güncelleme almaya devam eder. Adresi değiştirmek, eski kurulumları eski adreste bırakır.
+Sürümler kaynak koddan **ayrı, herkese açık** `ugurc4n/albi-update` deposunda yayınlanır (`electron-builder.yml` → `publish`). Bu adres her kurulum dosyasının içine yazılır; böylece bu kaynak depo ileride private olsa da kullanıcılar güncelleme almaya devam eder. Adresi değiştirmek, eski kurulumları eski adreste bırakır.
 
 **Bir kerelik kurulum:**
-1. GitHub'da **public** `albion-trade-intelligence` deposunu oluştur ve README ile başlat (boş depoda sürüm etiketi açılamaz). Bu isim, bu deponun eski adıdır; GitHub şu an onu buraya yönlendiriyor, yeni depo açınca yönlendirme kalkar.
+1. GitHub'da **public** `albi-update` deposu (oluşturuldu). İçinde en az bir commit olmalı: boş depoda sürüm etiketi açılamaz.
 2. Bir *fine-grained personal access token* oluştur: yalnızca o depo, **Contents: Read and write**.
 3. Bu depoda *Settings → Secrets and variables → Actions* altına `RELEASES_TOKEN` adıyla ekle.
 

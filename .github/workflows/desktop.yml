@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 env:
-  RELEASES_REPO: ugurc4n/albion-trade-intelligence
+  RELEASES_REPO: ugurc4n/albi-update
 
 jobs:
   build:
