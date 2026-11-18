@@ -41,7 +41,13 @@ const features = tableFeatures({
 
 const helper = createColumnHelper<typeof features, Opportunity>();
 
-type Variant = "flip" | "trade";
+type Variant = "flip" | "trade" | "blackmarket";
+
+/** Where the sale happens: a Black Market Buy Order, an Instant Sell or a Sell Order. */
+function sellLabel(o: Opportunity): string {
+  if (o.kind === "blackmarket") return "Black Market Buy Order";
+  return o.sellMode === "instant" ? "Instant Sell" : "Sell Order";
+}
 
 function ItemCell({ o }: { o: Opportunity }) {
   return (
@@ -125,7 +131,7 @@ function buildColumns(variant: Variant, maxAge: number) {
             cell: (i) => (
               <div className="leading-tight">
                 <Silver value={i.getValue()} />
-                <div className="text-[10px] text-muted-foreground">{i.row.original.sellMode === "instant" ? "Instant Sell" : "Sell Order"}</div>
+                <div className="text-[10px] text-muted-foreground">{sellLabel(i.row.original)}</div>
               </div>
             ),
           }),
@@ -192,7 +198,7 @@ function Breakdown({ o }: { o: Opportunity }) {
   const rows: [string, number, string?][] = [
     [o.buyMode === "instant" ? "Instant Buy price" : "Buy Order price", p.buyPrice],
     ["Buy Order Setup Fee", -p.buySetupFee, o.buyMode === "order" ? undefined : "none for Instant Buy"],
-    [o.sellMode === "instant" ? "Instant Sell price" : "Sell Order price", p.sellPrice],
+    [`${sellLabel(o)} price`, p.sellPrice],
     ["Sales Tax", -p.salesTax],
     ["Sell Order Setup Fee", -p.sellSetupFee, o.sellMode === "order" ? undefined : "none for Instant Sell"],
     ["Relists (assumption)", -p.relistCost],
@@ -234,18 +240,38 @@ function Breakdown({ o }: { o: Opportunity }) {
               {o.sellCity}: lowest sell <Silver value={o.targetSellMin} />, highest buy <Silver value={o.targetBuyMax} />
             </>
           )}
+          {o.kind === "blackmarket" && (
+            <>
+              {" · "}
+              {o.sellCity}: highest Buy Order <Silver value={o.targetBuyMax} />
+            </>
+          )}
         </p>
         <p>
           <span className="text-foreground">Volume (7-day avg.): </span>
           {o.buyCity} {o.sourceDailyVolume === null ? "no data" : `${formatDecimal(o.sourceDailyVolume)}/day`}
-          {o.kind === "trade" && ` · ${o.sellCity} ${o.targetDailyVolume === null ? "no data" : `${formatDecimal(o.targetDailyVolume)}/day`}`}
+          {o.kind !== "flip" && ` · ${o.sellCity} ${o.targetDailyVolume === null ? "no data" : `${formatDecimal(o.targetDailyVolume)}/day`}`}
           {o.volatility !== null && ` · volatility ${formatDecimal(o.volatility * 100)}%`}
         </p>
         <p>
           <span className="text-foreground">Estimated wait: </span>
           {o.estHoldDays === null ? "unknown" : o.estHoldDays === 0 ? "instant (depth not guaranteed)" : `~${formatDecimal(o.estHoldDays)} days (assuming a market share)`}
-          {o.weight > 0 && o.kind === "trade" && ` · weight ${formatDecimal(o.weight)} kg/unit, total ${formatDecimal(o.weight * o.recommendedQty)} kg`}
+          {o.weight > 0 &&
+            (o.kind === "trade" || o.flags.includes("red_zone_transport")) &&
+            ` · weight ${formatDecimal(o.weight)} kg/unit, total ${formatDecimal(o.weight * o.recommendedQty)} kg`}
         </p>
+        {o.orderbookDepth !== undefined && (
+          <p>
+            <span className="text-foreground">Order book: </span>
+            {formatSilver(o.orderbookDepth)} {o.orderbookDepth === 1 ? "unit" : "units"} available near the quoted price; the suggested quantity
+            never exceeds this.
+          </p>
+        )}
+        {o.flags.includes("red_zone_transport") && (
+          <p className="text-amber-300/90">
+            Carried from {o.buyCity} to Caerleon through red zones: you can be attacked and lose the goods. This risk is not part of the profit.
+          </p>
+        )}
         <p className="flex flex-wrap items-center gap-1">
           <FlagBadges flags={o.flags} />
         </p>

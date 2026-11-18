@@ -6,14 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useSettings } from "@/hooks/use-settings";
-import { QUALITY_LABELS, ROYAL_CITIES, SERVERS, SERVER_IDS, type ServerId } from "@/lib/albion/constants";
+import { CAERLEON, QUALITY_LABELS, ROYAL_CITIES, SERVERS, SERVER_IDS, type ServerId } from "@/lib/albion/constants";
 import { CATEGORY_LABELS } from "@/lib/catalog/types";
-import { SCENARIO_LABELS, type ScenarioId } from "@/lib/profit/engine";
+import { BLACK_MARKET_SCENARIOS, SCENARIO_LABELS, scenarioId, type ScenarioId } from "@/lib/profit/engine";
 import type { Filters } from "@/lib/settings/schema";
 import type { RiskLevel } from "@/lib/scanner/types";
 import { cn } from "@/lib/utils";
 
-type Variant = "flip" | "trade" | "basket";
+type Variant = "flip" | "trade" | "blackmarket" | "basket";
 
 export function FieldLabel({ children, lang }: { children: ReactNode; lang?: string }) {
   return <span lang={lang} className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{children}</span>;
@@ -138,6 +138,7 @@ const CATEGORIES = ["crafting", "weapons", "armors", "head", "shoes", "offhands"
   label: CATEGORY_LABELS[c] ?? c,
 }));
 const SCENARIOS = (Object.keys(SCENARIO_LABELS) as ScenarioId[]).map((value) => ({ value, label: SCENARIO_LABELS[value] }));
+const BLACK_MARKET_SCENARIO_OPTIONS = BLACK_MARKET_SCENARIOS.map(scenarioId).map((value) => ({ value, label: SCENARIO_LABELS[value] }));
 const RISKS: { value: RiskLevel; label: string }[] = [
   { value: "low", label: "Low" },
   { value: "medium", label: "Medium" },
@@ -200,9 +201,10 @@ export function FiltersBar({
         </label>
 
         <label className="flex flex-col gap-1">
-          <FieldLabel>{variant === "flip" ? "City" : "Buy city"}</FieldLabel>
+          <FieldLabel>{variant === "flip" ? "City" : variant === "blackmarket" ? "Buy market" : "Buy city"}</FieldLabel>
           <NativeSelect label="Buy city" value={filters.buyCity} onChange={(v) => onChange({ buyCity: v as Filters["buyCity"] })}>
             <option value="all">All</option>
+            {variant === "blackmarket" && <option value={CAERLEON}>{CAERLEON} (no transport)</option>}
             {ROYAL_CITIES.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -212,7 +214,7 @@ export function FiltersBar({
           </NativeSelect>
         </label>
 
-        {variant !== "flip" && (
+        {variant !== "flip" && variant !== "blackmarket" && (
           <label className="flex flex-col gap-1">
             <FieldLabel>Sell city</FieldLabel>
             <NativeSelect label="Sell city" value={filters.sellCity} onChange={(v) => onChange({ sellCity: v as Filters["sellCity"] })}>
@@ -271,7 +273,12 @@ export function FiltersBar({
           {variant !== "flip" && (
             <div className="flex flex-col gap-1 lg:col-span-2">
               <FieldLabel>Scenario</FieldLabel>
-              <Chips label="Scenario" options={SCENARIOS} value={filters.scenarios} onChange={(scenarios) => onChange({ scenarios })} />
+              <Chips
+                label="Scenario"
+                options={variant === "blackmarket" ? BLACK_MARKET_SCENARIO_OPTIONS : SCENARIOS}
+                value={filters.scenarios}
+                onChange={(scenarios) => onChange({ scenarios })}
+              />
             </div>
           )}
           <div className="flex flex-col gap-1">

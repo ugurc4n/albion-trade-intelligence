@@ -1,4 +1,4 @@
-import { toRoyalCity } from "@/lib/albion/constants";
+import { toMarketLocation, toRoyalCity } from "@/lib/albion/constants";
 import type { PriceRow } from "@/lib/albion/schemas";
 import type { Quote } from "./types";
 
@@ -25,7 +25,13 @@ function side(price: number, date: string): { price: number | null; at: number |
  * Returns null for non-royal locations or rows without any usable price.
  */
 export function normalizePriceRow(row: PriceRow): Quote | null {
-  const city = toRoyalCity(row.city);
+  if (!toRoyalCity(row.city)) return null;
+  return normalizeMarketRow(row);
+}
+
+/** Like normalizePriceRow, but also keeps Caerleon and Black Market rows. */
+export function normalizeMarketRow(row: PriceRow): Quote | null {
+  const city = toMarketLocation(row.city);
   if (!city) return null;
   const sell = side(row.sell_price_min, row.sell_price_min_date);
   const buy = side(row.buy_price_max, row.buy_price_max_date);

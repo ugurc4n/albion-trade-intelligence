@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ROYAL_CITIES, SERVER_IDS, type ServerId } from "@/lib/albion/constants";
+import { CAERLEON, ROYAL_CITIES, SERVER_IDS, type ServerId } from "@/lib/albion/constants";
 import { DEFAULT_FEES } from "@/lib/profit/fees";
 
 export const RISK_PREFERENCES = ["conservative", "balanced", "aggressive"] as const;
@@ -42,7 +42,8 @@ export type Settings = z.infer<typeof settingsSchema>;
 
 export const DEFAULT_SETTINGS: Settings = settingsSchema.parse({});
 
-const cityFilter = z.union([z.enum(ROYAL_CITIES), z.literal("all")]);
+/** Caerleon is only a valid buy market on the Black Market page; the other scanners never see a Caerleon quote. */
+const cityFilter = z.union([z.enum(ROYAL_CITIES), z.literal(CAERLEON), z.literal("all")]);
 const numOrNull = z.number().nullable();
 
 export const filtersSchema = z.object({
@@ -73,7 +74,8 @@ export const DEFAULT_FILTERS: Filters = filtersSchema.parse({});
 export const opportunitiesRequestSchema = z.object({
   settings: settingsSchema,
   filters: filtersSchema.default(DEFAULT_FILTERS),
-  kind: z.enum(["flip", "trade", "all"]).default("all"),
+  /** "all" = flips + trades (Dashboard, Optimizer). The Black Market is only scanned when asked for explicitly. */
+  kind: z.enum(["flip", "trade", "blackmarket", "all"]).default("all"),
   limit: z.number().int().min(1).max(2000).default(500),
 });
 

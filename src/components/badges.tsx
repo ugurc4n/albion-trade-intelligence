@@ -77,6 +77,10 @@ export const FLAG_INFO: Record<OpportunityFlag, { label: string; tip: string }> 
   extreme_roi: { label: "Extreme ROI", tip: "ROI above 150%. Usually caused by stale or mistaken orders." },
   stale: { label: "Stale data", tip: "One of the prices used is older than the data-age limit. Not a current opportunity." },
   budget_exceeds: { label: "Over budget", tip: "A single unit costs more than the trade budget." },
+  red_zone_transport: {
+    label: "Red zone",
+    tip: "Bought in a Royal City: the haul to Caerleon crosses red zones, where you can be attacked and lose the goods. Transport cost and carry capacity from Settings are applied.",
+  },
 };
 
 export function FlagBadges({ flags }: { flags: OpportunityFlag[] }) {

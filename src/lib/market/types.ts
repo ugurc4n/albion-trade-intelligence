@@ -1,10 +1,10 @@
-import type { City } from "@/lib/albion/constants";
+import type { MarketLocation } from "@/lib/albion/constants";
 
-/** Normalized current-price quote for one item + quality in one city. Missing sides are null. */
+/** Normalized current-price quote for one item + quality in one market location. Missing sides are null. */
 export type Quote = {
   itemId: string;
   quality: number;
-  city: City;
+  city: MarketLocation;
   /** Lowest sell order (what an instant buy costs). */
   sellMin: number | null;
   sellMinAt: number | null;

@@ -4,7 +4,7 @@ import type { CatalogItem } from "@/lib/catalog/types";
 import type { PlayerResponse, PlayerSummary } from "@/lib/killboard/types";
 import type { HistorySeries, OrderbookEntry } from "@/lib/albion/schemas";
 import type { Quote } from "@/lib/market/types";
-import type { Filters, Settings } from "@/lib/settings/schema";
+import type { Filters, OpportunitiesRequest, Settings } from "@/lib/settings/schema";
 
 export class ClientApiError extends Error {
   constructor(
@@ -34,7 +34,7 @@ async function handle<T>(res: Response): Promise<T> {
 }
 
 export async function fetchOpportunities(
-  args: { settings: Settings; filters: Filters; kind: "flip" | "trade" | "all"; limit: number },
+  args: { settings: Settings; filters: Filters; kind: OpportunitiesRequest["kind"]; limit: number },
   signal?: AbortSignal,
 ): Promise<OpportunitiesResponse> {
   const res = await fetch("/api/opportunities", {

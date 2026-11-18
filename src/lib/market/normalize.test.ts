@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PriceRow } from "@/lib/albion/schemas";
 import { computeVolumeStats } from "./history";
-import { normalizePriceRow, parseApiDate } from "./normalize";
+import { normalizeMarketRow, normalizePriceRow, parseApiDate } from "./normalize";
 
 const EMPTY = "0001-01-01T00:00:00";
 
@@ -111,5 +111,14 @@ describe("computeVolumeStats", () => {
     );
     expect(s.avgDailyVolume).toBeCloseTo(30 / 7);
     expect(s.volatility).toBeGreaterThan(0.1);
+  });
+});
+
+describe("normalizeMarketRow", () => {
+  it("keeps Caerleon and Black Market rows but still rejects other locations", () => {
+    expect(normalizeMarketRow(row({ city: "Caerleon" }))?.city).toBe("Caerleon");
+    expect(normalizeMarketRow(row({ city: "Black Market" }))?.city).toBe("Black Market");
+    expect(normalizeMarketRow(row({ city: "Fort Sterling" }))?.city).toBe("Fort Sterling");
+    expect(normalizeMarketRow(row({ city: "Brecilien" }))).toBeNull();
   });
 });

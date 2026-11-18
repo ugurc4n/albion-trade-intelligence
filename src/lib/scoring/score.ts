@@ -81,6 +81,7 @@ function riskLevel(input: ScoreInput): RiskLevel {
   if (
     flags.includes("low_volume") ||
     flags.includes("volatile") ||
+    flags.includes("red_zone_transport") ||
     input.volatility === null ||
     (input.estHoldDays ?? 0) > 3.5
   ) {

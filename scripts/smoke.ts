@@ -15,6 +15,9 @@ async function main() {
   console.log(`TRADES total=${res.trades.total}`); res.trades.items.forEach((o) => console.log(" ", fmt(o)));
   console.log("BASKET", { inv: res.basket.totalInvestment, profit: res.basket.estimatedProfit, unused: res.basket.unusedBudget });
   res.basket.lines.forEach((l) => console.log("  ", l.quantity, "x", fmt(l.opportunity), "cap", l.capital.toFixed(0), l.limitedBy));
+  const bm = await runOpportunities(opportunitiesRequestSchema.parse({ settings: {}, filters: { buyCity: "all" }, kind: "blackmarket", limit: 8 }));
+  console.log(`BLACK MARKET total=${bm.blackMarket.total} orderbookChecked=${bm.orderbookChecked}`);
+  bm.blackMarket.items.forEach((o) => console.log(" ", fmt(o), o.orderbookDepth !== undefined ? `depth=${o.orderbookDepth}` : ""));
   const t1 = Date.now();
   await runOpportunities(req);
   console.log(`second (cached) run ${Date.now() - t1}ms`);

@@ -1,5 +1,8 @@
-import type { City } from "@/lib/albion/constants";
+import type { MarketLocation } from "@/lib/albion/constants";
 import type { ProfitResult, ScenarioId, TradeMode } from "@/lib/profit/engine";
+
+/** flip = same Royal City, trade = Royal City → Royal City, blackmarket = Caerleon or a Royal City → Black Market. */
+export type OpportunityKind = "flip" | "trade" | "blackmarket";
 
 export type RiskLevel = "low" | "medium" | "high";
 export type Confidence = "high" | "medium" | "low";
@@ -11,11 +14,12 @@ export type OpportunityFlag =
   | "price_outlier" // a used price deviates strongly from its 7-day average
   | "extreme_roi" // ROI above 150% — usually stale or troll orders
   | "stale" // a used price is older than the max data age
-  | "budget_exceeds"; // a single unit costs more than the trade budget
+  | "budget_exceeds" // a single unit costs more than the trade budget
+  | "red_zone_transport"; // Black Market run from a Royal City: the haul to Caerleon crosses red zones
 
 export type Opportunity = {
   id: string;
-  kind: "flip" | "trade";
+  kind: OpportunityKind;
   itemId: string;
   quality: number;
   name: string;
@@ -24,8 +28,8 @@ export type Opportunity = {
   category: string;
   weight: number;
 
-  buyCity: City;
-  sellCity: City;
+  buyCity: MarketLocation;
+  sellCity: MarketLocation;
   buyMode: TradeMode;
   sellMode: TradeMode;
   scenario: ScenarioId;
@@ -50,6 +54,8 @@ export type Opportunity = {
   volatility: number | null;
 
   recommendedQty: number;
+  /** Units the order book shows at the quoted instant price(s); set only when it was checked and capped the quantity. */
+  orderbookDepth?: number;
   requiredCapital: number;
   potentialProfit: number;
   /** Rough days until the position is filled/sold under the market-share assumption; null = unknown. */

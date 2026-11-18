@@ -12,7 +12,13 @@ export const SCENARIOS: Scenario[] = [
   { buy: "instant", sell: "instant" },
 ];
 
-export const scenarioId = (s: Scenario) => `${s.buy}-${s.sell}` as const;
+/** Players can only sell to the Black Market, so every Black Market scenario ends with an Instant Sell into its Buy Order. */
+export const BLACK_MARKET_SCENARIOS: Scenario[] = [
+  { buy: "instant", sell: "instant" },
+  { buy: "order", sell: "instant" },
+];
+
+export const scenarioId =(s: Scenario) => `${s.buy}-${s.sell}` as const;
 export type ScenarioId = ReturnType<typeof scenarioId>;
 
 export const SCENARIO_LABELS: Record<ScenarioId, string> = {

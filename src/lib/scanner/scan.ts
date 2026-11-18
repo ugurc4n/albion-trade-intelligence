@@ -1,5 +1,7 @@
+import { CAERLEON } from "@/lib/albion/constants";
 import { matchesItemQuery, type CatalogItem } from "@/lib/catalog/types";
 import {
+  BLACK_MARKET_SCENARIOS,
   SCENARIOS,
   calculateProfit,
   scenarioId,
@@ -11,11 +13,15 @@ import { quoteKey, type Quote, type VolumeStats } from "@/lib/market/types";
 import { RISK_PARAMS } from "@/lib/scoring/risk-params";
 import { EXTREME_ROI, HIGH_VOLATILITY, LOW_VOLUME_PER_DAY, isPriceOutlier, scoreOpportunity } from "@/lib/scoring/score";
 import type { Filters, Settings } from "@/lib/settings/schema";
-import type { Opportunity, OpportunityFlag, RiskLevel } from "./types";
+import type { Opportunity, OpportunityFlag, OpportunityKind, RiskLevel } from "./types";
 
 export type MarketData = {
-  /** groupKey(itemId, quality) → quotes for the cities that have data. */
+  /** groupKey(itemId, quality) → quotes for the Royal Cities that have data. */
   quotesByGroup: Map<string, Quote[]>;
+  /** groupKey(itemId, quality) → Caerleon market quote. */
+  caerleon: Map<string, Quote>;
+  /** groupKey(itemId, quality) → Black Market quote (its buyMax is the Black Market Buy Order). */
+  blackMarket: Map<string, Quote>;
   /** quoteKey(itemId, quality, city) → 7-day volume stats. */
   volume: Map<string, VolumeStats>;
 };
@@ -58,7 +64,7 @@ function itemMatches(item: CatalogItem, quality: number, f: Filters): boolean {
 
 /** Builds one opportunity for a given source/target quote pair and scenario, or null if prices are missing. */
 export function buildOpportunity(
-  kind: "flip" | "trade",
+  kind: OpportunityKind,
   item: CatalogItem,
   src: Quote,
   tgt: Quote,
@@ -74,7 +80,9 @@ export function buildOpportunity(
   const params = RISK_PARAMS[settings.riskPreference];
   const maxAge = filters.maxDataAgeMinutes ?? settings.maxDataAgeMinutes;
 
-  const transportPerUnit = kind === "trade" ? item.weight * settings.transportCostPerKg : 0;
+  // Goods are carried for Cross-City Trade and for Black Market runs that start outside Caerleon.
+  const hauled = kind === "trade" || (kind === "blackmarket" && src.city !== CAERLEON);
+  const transportPerUnit = hauled ? item.weight * settings.transportCostPerKg : 0;
   const profit = calculateProfit({
     buyPrice: buy.price,
     sellPrice: sell.price,
@@ -110,6 +118,7 @@ export function buildOpportunity(
   if (profit.roi > EXTREME_ROI) flags.push("extreme_roi");
   if (dataAgeMinutes > maxAge) flags.push("stale");
   if (profit.upfrontPerUnit > settings.tradeBudget) flags.push("budget_exceeds");
+  if (kind === "blackmarket" && hauled) flags.push("red_zone_transport");
 
   // Position sizing.
   const preRisk: RiskLevel =
@@ -128,7 +137,7 @@ export function buildOpportunity(
   } else {
     caps.push(UNKNOWN_VOLUME_MAX_QTY);
   }
-  if (kind === "trade" && settings.carryCapacityKg && item.weight > 0) caps.push(settings.carryCapacityKg / item.weight);
+  if (hauled && settings.carryCapacityKg && item.weight > 0) caps.push(settings.carryCapacityKg / item.weight);
   if (filters.maxInvestment !== null && filters.maxInvestment > 0) caps.push(filters.maxInvestment / profit.upfrontPerUnit);
   const rawQty = Math.floor(Math.min(...caps));
   const recommendedQty = profit.unitProfit > 0 && Number.isFinite(rawQty) ? Math.max(0, rawQty) : 0;
@@ -249,6 +258,35 @@ export function scanTrades(data: MarketData, ctx: ScanContext): Opportunity[] {
           const opp = buildOpportunity("trade", item, src, tgt, scenario, data.volume, ctx);
           if (opp && passesResultFilters(opp, ctx)) out.push(opp);
         }
+      }
+    }
+  }
+  return out.sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Black Market flipping: buy in Caerleon (or in a Royal City and carry it to Caerleon), then Instant Sell into the
+ * Black Market Buy Order. Exact item id + Quality match.
+ */
+export function scanBlackMarket(data: MarketData, ctx: ScanContext): Opportunity[] {
+  const { filters } = ctx;
+  const scenarios = BLACK_MARKET_SCENARIOS.filter((s) => !filters.scenarios.length || filters.scenarios.includes(scenarioId(s)));
+  if (!scenarios.length) return [];
+  const out: Opportunity[] = [];
+  for (const [key, bm] of data.blackMarket) {
+    if (bm.buyMax === null || bm.buyMaxAt === null) continue;
+    const item = ctx.getItem(bm.itemId);
+    if (!item || !itemMatches(item, bm.quality, filters)) continue;
+    const caerleon = data.caerleon.get(key);
+    const sources = [...(caerleon ? [caerleon] : []), ...(data.quotesByGroup.get(key) ?? [])];
+    for (const src of sources) {
+      if (filters.buyCity !== "all" && src.city !== filters.buyCity) continue;
+      const cheapestBuy = Math.min(src.sellMin ?? Infinity, src.buyMax !== null ? src.buyMax + 1 : Infinity);
+      if (!Number.isFinite(cheapestBuy)) continue;
+      if (!filters.includeUnprofitable && bm.buyMax <= cheapestBuy) continue;
+      for (const scenario of scenarios) {
+        const opp = buildOpportunity("blackmarket", item, src, bm, scenario, data.volume, ctx);
+        if (opp && passesResultFilters(opp, ctx)) out.push(opp);
       }
     }
   }

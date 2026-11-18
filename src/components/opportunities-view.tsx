@@ -3,35 +3,53 @@
 import { FiltersBar } from "@/components/filters-bar";
 import { OpportunityTable } from "@/components/opportunity-table";
 import { DataStatus, Disclaimer, HiddenOpportunities, PageHeader } from "@/components/page-parts";
+import type { SectionKey } from "@/components/sections";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/states";
 import { useOpportunities } from "@/hooks/use-opportunities";
 import { usePageFilters } from "@/hooks/use-page-filters";
 import { useSettings } from "@/hooks/use-settings";
-import { DEFAULT_FILTERS } from "@/lib/settings/schema";
+import { CAERLEON } from "@/lib/albion/constants";
+import { DEFAULT_FILTERS, type Filters, type Settings } from "@/lib/settings/schema";
 
-const COPY = {
+export type OpportunityVariant = "flip" | "trade" | "blackmarket";
+
+const COPY: Record<OpportunityVariant, { section: SectionKey; title: string; description: string }> = {
   flip: {
+    section: "flipping",
     title: "Market Flipping",
     description:
       "Place a Buy Order (1 silver above the highest Buy Order) and resell with a Sell Order (1 silver below the lowest Sell Order) in the same city. The spread shown is not guaranteed profit; orders may not fill and prices may move.",
   },
   trade: {
+    section: "trade",
     title: "Cross-City Trade",
     description:
       "Safe routes between the Royal Cities (Martlock, Lymhurst, Bridgewatch, Fort Sterling, Thetford), excluding Caerleon and Brecilien. Instant Buy/Instant Sell and Buy Order/Sell Order prices are calculated as separate scenarios.",
   },
-} as const;
+  blackmarket: {
+    section: "blackmarket",
+    title: "Black Market Flipping",
+    description:
+      "Buy in Caerleon (or in a Royal City and carry it through red zones to Caerleon), then Instant Sell into the Black Market Buy Order. Same item and Quality only. Black Market Buy Orders are often just a few units and disappear fast, so the quantity is capped by the order book where possible.",
+  },
+};
 
-export function OpportunitiesView({ variant }: { variant: "flip" | "trade" }) {
+const INITIAL_FILTERS: Record<OpportunityVariant, (s: Settings) => Partial<Filters>> = {
+  flip: (s) => ({ buyCity: s.homeCity }),
+  trade: (s) => ({ buyCity: s.homeCity }),
+  blackmarket: () => ({ buyCity: CAERLEON }),
+};
+
+export function OpportunitiesView({ variant }: { variant: OpportunityVariant }) {
   const { settings } = useSettings();
-  const { filters, update, reset } = usePageFilters((s) => ({ buyCity: s.homeCity }));
+  const { filters, update, reset } = usePageFilters(INITIAL_FILTERS[variant]);
   const query = useOpportunities(variant, filters ?? DEFAULT_FILTERS, 1000);
-  const list = variant === "flip" ? query.data?.flips : query.data?.trades;
+  const list = variant === "flip" ? query.data?.flips : variant === "trade" ? query.data?.trades : query.data?.blackMarket;
   const maxAge = filters?.maxDataAgeMinutes ?? settings.maxDataAgeMinutes;
 
   return (
     <div>
-      <PageHeader section={variant === "flip" ? "flipping" : "trade"}
+      <PageHeader section={COPY[variant].section}
         title={COPY[variant].title}
         description={COPY[variant].description}
         actions={<DataStatus meta={query.data?.meta} isFetching={query.isFetching} onRefresh={() => query.refetch()} />}

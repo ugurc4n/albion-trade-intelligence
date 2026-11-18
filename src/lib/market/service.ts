@@ -4,13 +4,13 @@
  */
 import { AlbionApiError, AlbionClient } from "@/lib/albion/client";
 import { chunkIds, isValidItemId } from "@/lib/albion/batching";
-import { CACHE_TTL, MAX_URL_LENGTH, ROYAL_CITIES, toRoyalCity, type ServerId } from "@/lib/albion/constants";
+import { BLACK_MARKET, CACHE_TTL, CAERLEON, MARKET_LOCATIONS, MAX_URL_LENGTH, ROYAL_CITIES, toMarketLocation, type ServerId } from "@/lib/albion/constants";
 import { TtlCache } from "@/lib/albion/cache";
 import type { HistorySeries, OrderbookEntry, PriceRow } from "@/lib/albion/schemas";
 import { allCatalogItems } from "@/lib/catalog/catalog";
 import { buildScanUniverse } from "@/lib/catalog/universe";
 import { computeVolumeStats } from "./history";
-import { normalizePriceRow } from "./normalize";
+import { normalizeMarketRow, normalizePriceRow } from "./normalize";
 import { groupKey, quoteKey, type Quote, type VolumeStats } from "./types";
 import type { MarketData } from "@/lib/scanner/scan";
 
@@ -35,7 +35,7 @@ function getUniverseChunks(): string[][] {
     UNIVERSE,
     (ids) =>
       AlbionClient.buildUrl("europe", "history", ids, {
-        locations: ROYAL_CITIES.join(","),
+        locations: MARKET_LOCATIONS.join(","),
         "time-scale": "24",
         date: "2026-01-01",
       }),
@@ -83,16 +83,16 @@ export async function getMarketSnapshot(server: ServerId): Promise<MarketSnapsho
 
   const priceResults = await Promise.allSettled(
     chunks.map((ids, i) =>
-      cache.get<PriceRow[]>(`prices:${server}:${i}`, CACHE_TTL.pricesMs, async () => {
-        const res = await client.getPrices(server, ids, ROYAL_CITIES);
+      cache.get<PriceRow[]>(`prices:market:${server}:${i}`, CACHE_TTL.pricesMs, async () => {
+        const res = await client.getPrices(server, ids, MARKET_LOCATIONS);
         return res.rows;
       }),
     ),
   );
   const historyResults = await Promise.allSettled(
     chunks.map((ids, i) =>
-      cache.get<[string, VolumeStats][]>(`history:${server}:${i}`, CACHE_TTL.historyMs, async () => {
-        const res = await client.getHistory(server, ids, ROYAL_CITIES, { timeScale: 24, date: isoDate(Date.now() - 8 * DAY_MS) });
+      cache.get<[string, VolumeStats][]>(`history:market:${server}:${i}`, CACHE_TTL.historyMs, async () => {
+        const res = await client.getHistory(server, ids, MARKET_LOCATIONS, { timeScale: 24, date: isoDate(Date.now() - 8 * DAY_MS) });
         return volumeEntries(res.rows, Date.now());
       }),
     ),
@@ -128,17 +128,28 @@ export async function getMarketSnapshot(server: ServerId): Promise<MarketSnapsho
   if (memo && memo.signature === signature) return { ...memo.snapshot, meta };
 
   const quotesByGroup = new Map<string, Quote[]>();
+  const caerleon = new Map<string, Quote>();
+  const blackMarket = new Map<string, Quote>();
   let quoteCount = 0;
   for (const r of priceResults) {
     if (r.status !== "fulfilled") continue;
     for (const row of r.value.value) {
-      const quote = normalizePriceRow(row);
+      const quote = normalizeMarketRow(row);
       if (!quote) continue;
       const key = groupKey(quote.itemId, quote.quality);
+      quoteCount++;
+      // Caerleon and the Black Market stay out of quotesByGroup, so Flipping and Cross-City Trade remain Royal-only.
+      if (quote.city === CAERLEON) {
+        caerleon.set(key, quote);
+        continue;
+      }
+      if (quote.city === BLACK_MARKET) {
+        blackMarket.set(key, quote);
+        continue;
+      }
       const list = quotesByGroup.get(key);
       if (list) list.push(quote);
       else quotesByGroup.set(key, [quote]);
-      quoteCount++;
     }
   }
   const volume = new Map<string, VolumeStats>();
@@ -147,7 +158,7 @@ export async function getMarketSnapshot(server: ServerId): Promise<MarketSnapsho
     for (const [k, v] of r.value.value) volume.set(k, v);
   }
 
-  const snapshot: MarketSnapshot = { quotesByGroup, volume, meta, quoteCount };
+  const snapshot: MarketSnapshot = { quotesByGroup, caerleon, blackMarket, volume, meta, quoteCount };
   snapshots.set(server, { signature, snapshot });
   return snapshot;
 }
@@ -155,7 +166,7 @@ export async function getMarketSnapshot(server: ServerId): Promise<MarketSnapsho
 function volumeEntries(series: HistorySeries[], now: number): [string, VolumeStats][] {
   const out: [string, VolumeStats][] = [];
   for (const s of series) {
-    const city = toRoyalCity(s.location);
+    const city = toMarketLocation(s.location);
     if (!city) continue;
     out.push([quoteKey(s.item_id, s.quality, city), computeVolumeStats(s.data, now)]);
   }
@@ -169,7 +180,7 @@ export async function getOrderbooks(server: ServerId, itemIds: string[]): Promis
   const missing: string[] = [];
   const now = Date.now();
   for (const id of new Set(itemIds)) {
-    const hit = cache.peek<OrderbookEntry[]>(`orderbook:${server}:${id}`);
+    const hit = cache.peek<OrderbookEntry[]>(`orderbook:market:${server}:${id}`);
     if (hit && now - hit.fetchedAt <= CACHE_TTL.orderbookMs) result.set(id, hit.value);
     else missing.push(id);
   }
@@ -177,17 +188,17 @@ export async function getOrderbooks(server: ServerId, itemIds: string[]): Promis
 
   const chunks = chunkIds(
     missing,
-    (ids) => AlbionClient.buildUrl(server, "orderbook", ids, { locations: ROYAL_CITIES.join(",") }),
+    (ids) => AlbionClient.buildUrl(server, "orderbook", ids, { locations: MARKET_LOCATIONS.join(",") }),
     MAX_URL_LENGTH,
   );
-  const settled = await Promise.allSettled(chunks.map((ids) => client.getOrderbook(server, ids, ROYAL_CITIES)));
+  const settled = await Promise.allSettled(chunks.map((ids) => client.getOrderbook(server, ids, MARKET_LOCATIONS)));
   settled.forEach((r, i) => {
     if (r.status !== "fulfilled") return;
     const byItem = new Map<string, OrderbookEntry[]>(chunks[i].map((id) => [id, []]));
     for (const entry of r.value.rows) byItem.get(entry.item_id)?.push(entry);
     for (const [id, entries] of byItem) {
       result.set(id, entries);
-      cache.put(`orderbook:${server}:${id}`, entries);
+      cache.put(`orderbook:market:${server}:${id}`, entries);
     }
   });
   return result;

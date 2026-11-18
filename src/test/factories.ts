@@ -1,4 +1,4 @@
-import type { City } from "@/lib/albion/constants";
+import { BLACK_MARKET, CAERLEON, type MarketLocation } from "@/lib/albion/constants";
 import type { CatalogItem } from "@/lib/catalog/types";
 import type { Quote, VolumeStats } from "@/lib/market/types";
 import { groupKey, quoteKey } from "@/lib/market/types";
@@ -23,7 +23,7 @@ export function item(overrides: Partial<CatalogItem> = {}): CatalogItem {
   };
 }
 
-export function quote(city: City, overrides: Partial<Quote> = {}): Quote {
+export function quote(city: MarketLocation, overrides: Partial<Quote> = {}): Quote {
   return {
     itemId: "T4_BAG",
     quality: 1,
@@ -48,15 +48,20 @@ export function volume(overrides: Partial<VolumeStats> = {}): VolumeStats {
   };
 }
 
+/** Routes quotes like the market service does: Caerleon and Black Market quotes get their own maps. */
 export function marketData(quotes: Quote[], volumes: [Quote, VolumeStats][] = []): MarketData {
   const quotesByGroup = new Map<string, Quote[]>();
+  const caerleon = new Map<string, Quote>();
+  const blackMarket = new Map<string, Quote>();
   for (const q of quotes) {
     const key = groupKey(q.itemId, q.quality);
-    quotesByGroup.set(key, [...(quotesByGroup.get(key) ?? []), q]);
+    if (q.city === CAERLEON) caerleon.set(key, q);
+    else if (q.city === BLACK_MARKET) blackMarket.set(key, q);
+    else quotesByGroup.set(key, [...(quotesByGroup.get(key) ?? []), q]);
   }
   const vol = new Map<string, VolumeStats>();
   for (const [q, v] of volumes) vol.set(quoteKey(q.itemId, q.quality, q.city), v);
-  return { quotesByGroup, volume: vol };
+  return { quotesByGroup, caerleon, blackMarket, volume: vol };
 }
 
 export function scanContext(

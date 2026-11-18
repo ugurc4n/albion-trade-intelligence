@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { item, marketData, minutesAgo, quote, scanContext, volume } from "@/test/factories";
-import { UNKNOWN_VOLUME_MAX_QTY, scanFlips, scanTrades } from "./scan";
+import { UNKNOWN_VOLUME_MAX_QTY, scanBlackMarket, scanFlips, scanTrades } from "./scan";
 
 describe("scanFlips", () => {
   it("finds a buy order → sell order spread in one city with fees applied", () => {
@@ -94,5 +94,73 @@ describe("scanTrades", () => {
     expect(Math.max(...byWeight.map((o) => o.recommendedQty))).toBeLessThanOrEqual(10);
     const byInvestment = scanTrades(data, scanContext([item()], {}, { maxInvestment: 5000 }));
     for (const o of byInvestment) expect(o.requiredCapital).toBeLessThanOrEqual(5000);
+  });
+});
+
+describe("scanBlackMarket", () => {
+  const caerleon = quote("Caerleon", { sellMin: 1000, buyMax: 900 });
+  const martlock = quote("Martlock", { sellMin: 1000, buyMax: 900 });
+  const bm = quote("Black Market", { sellMin: null, sellMinAt: null, buyMax: 1500 });
+  const vols: [typeof bm, ReturnType<typeof volume>][] = [
+    [caerleon, volume()],
+    [martlock, volume()],
+    [bm, volume({ avgPrice: 1500 })],
+  ];
+
+  it("Caerleon Instant Buy → Black Market Instant Sell pays only Sales Tax and no transport", () => {
+    const opps = scanBlackMarket(marketData([caerleon, bm], vols), scanContext([item()], { transportCostPerKg: 10 }));
+    const ii = opps.find((o) => o.scenario === "instant-instant")!;
+    expect(ii.kind).toBe("blackmarket");
+    expect(ii.buyCity).toBe("Caerleon");
+    expect(ii.sellCity).toBe("Black Market");
+    expect(ii.profit.buyPrice).toBe(1000);
+    expect(ii.profit.sellPrice).toBe(1500);
+    expect(ii.profit.transport).toBe(0);
+    expect(ii.profit.unitProfit).toBeCloseTo(1500 * (1 - 0.08) - 1000);
+    expect(ii.flags).not.toContain("red_zone_transport");
+  });
+
+  it("a Buy Order source pays the Setup Fee", () => {
+    const opps = scanBlackMarket(marketData([caerleon, bm], vols), scanContext([item()]));
+    const oi = opps.find((o) => o.scenario === "order-instant")!;
+    expect(oi.profit.buyPrice).toBe(901);
+    expect(oi.profit.unitProfit).toBeCloseTo(1500 * (1 - 0.08) - 901 * 1.025);
+  });
+
+  it("a Royal City source pays transport and is flagged as a red-zone haul", () => {
+    const opps = scanBlackMarket(marketData([martlock, bm], vols), scanContext([item()], { transportCostPerKg: 10 }));
+    const ii = opps.find((o) => o.scenario === "instant-instant")!;
+    expect(ii.buyCity).toBe("Martlock");
+    expect(ii.profit.transport).toBeCloseTo(3.4 * 10);
+    expect(ii.flags).toContain("red_zone_transport");
+    expect(ii.risk).not.toBe("low");
+  });
+
+  it("applies the buy market filter", () => {
+    const data = marketData([caerleon, martlock, bm], vols);
+    const all = scanBlackMarket(data, scanContext([item()]));
+    expect(new Set(all.map((o) => o.buyCity))).toEqual(new Set(["Caerleon", "Martlock"]));
+    const onlyCaerleon = scanBlackMarket(data, scanContext([item()], {}, { buyCity: "Caerleon" }));
+    expect(onlyCaerleon.length).toBeGreaterThan(0);
+    expect(onlyCaerleon.every((o) => o.buyCity === "Caerleon")).toBe(true);
+  });
+
+  it("needs a Black Market Buy Order and a Black Market scenario", () => {
+    const noOrder = quote("Black Market", { buyMax: null, buyMaxAt: null });
+    expect(scanBlackMarket(marketData([caerleon, noOrder]), scanContext([item()]))).toHaveLength(0);
+    const data = marketData([caerleon, bm], vols);
+    expect(scanBlackMarket(data, scanContext([item()], {}, { scenarios: ["order-order"] }))).toHaveLength(0);
+  });
+
+  it("never matches a different Quality", () => {
+    const good = quote("Caerleon", { quality: 2, sellMin: 1000, buyMax: 900 });
+    expect(scanBlackMarket(marketData([good, bm]), scanContext([item()]))).toHaveLength(0);
+  });
+
+  it("keeps Caerleon and the Black Market out of Market Flipping and Cross-City Trade", () => {
+    const data = marketData([caerleon, martlock, bm], vols);
+    const flips = scanFlips(data, scanContext([item()], {}, { includeUnprofitable: true }));
+    expect(flips.map((o) => o.buyCity)).toEqual(["Martlock"]);
+    expect(scanTrades(data, scanContext([item()], {}, { includeUnprofitable: true }))).toHaveLength(0);
   });
 });

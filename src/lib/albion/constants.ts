@@ -23,6 +23,23 @@ export function toRoyalCity(location: string): City | null {
   return CITY_LOOKUP.get(location.toLowerCase().replace(/\s+/g, "")) ?? null;
 }
 
+export const CAERLEON = "Caerleon";
+/** The Black Market sits in Caerleon; players can only sell to it. */
+export const BLACK_MARKET = "Black Market";
+
+/** Every market location the snapshot loads: the Royal Cities plus Caerleon and the Black Market. */
+export const MARKET_LOCATIONS = [...ROYAL_CITIES, CAERLEON, BLACK_MARKET] as const;
+export type MarketLocation = (typeof MARKET_LOCATIONS)[number];
+
+const LOCATION_LOOKUP = new Map<string, MarketLocation>(
+  MARKET_LOCATIONS.map((c) => [c.toLowerCase().replace(/\s+/g, ""), c]),
+);
+
+/** Maps an API location string to a Royal City, Caerleon or the Black Market; null for anything else (Brecilien, portals, ...). */
+export function toMarketLocation(location: string): MarketLocation | null {
+  return LOCATION_LOOKUP.get(location.toLowerCase().replace(/\s+/g, "")) ?? null;
+}
+
 export const QUALITY_LABELS: Record<number, string> = {
   1: "Normal",
   2: "Good",
